@@ -4,7 +4,7 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 
 - `index.html` is the page. `FIREBASE` near the top of its script holds the project's web settings, which are public by design.
 - `stations.json` is the station list (id, number, name, docks, location).
-- `routes.json` holds travel minutes between every pair of stations, DC (Cleveland Park Metro) and six Alexandria-area Metro stations, for driving, biking and walking (OSRM, OpenStreetMap). Rebuild it when stations change.
+- `routes.json` holds travel minutes between every pair of stations, DC (Cleveland Park Metro) and six Alexandria-area Metro stations, for driving and biking (OSRM, OpenStreetMap). Rebuild it when stations change.
 - `firestore.rules` are the database rules. Paste them in the Firebase console under Firestore Database, Rules, and publish. They allow anyone to mark or unmark a station, but not to delete records, add other fields or set the time.
 
 ## Finding a station
@@ -19,7 +19,7 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 The route button (top right) plans trips through the stations not yet done.
 
 - Start and End: BCD (Witter Field station), DC (Cleveland Park Metro), your location, or a station or spot tapped on the map. End can be the same as the start.
-- Drive, Bike or Walk, and the daily limit: a number of stations or a time, plus minutes spent at each stop. "All left" plans one trip through everything.
+- Drive or Bike, and the daily limit: a number of stations or a time, plus minutes spent at each stop. "All left" plans one trip through everything.
 - **Plan all days** splits every station left into compact day trips that each fit the limit (savings-based grouping, then small days folded into others and stations moved between days wherever that shortens the total). Days are coloured and numbered on the map; tap one to make it today's route.
 - **Plan today** builds the same full plan and hands you its fullest day, so today's route never strands scattered stations. Finished stations drop out each time you plan again, so the plan adapts as work gets done.
 - Heading to DC: when driving, each day ends at its last stop and the drive to DC isn't counted. When biking, each day ends with the ride to whichever Metro station is quickest from the last stop (King St–Old Town, Braddock Rd, Eisenhower Ave, Van Dorn St, Potomac Yard or Huntington); the train to DC isn't counted.

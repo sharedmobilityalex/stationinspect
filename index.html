@@ -123,7 +123,7 @@ const WITTER = '2064975968599672936';
 const DAY_COLORS = ['#2563eb', '#ea580c', '#7c3aed', '#0d9488', '#db2777', '#92400e', '#65a30d', '#334155', '#ca8a04', '#0891b2'];
 const dayColor = (i) => DAY_COLORS[i % DAY_COLORS.length];
 // Live travel times for a spot that isn't in routes.json. The main OSRM server answers driving fastest.
-const OSRM = { drive: 'https://router.project-osrm.org', bike: 'https://routing.openstreetmap.de/routed-bike', walk: 'https://routing.openstreetmap.de/routed-foot' };
+const OSRM = { drive: 'https://router.project-osrm.org', bike: 'https://routing.openstreetmap.de/routed-bike' };
 const embedded = window.self !== window.top;
 
 const $ = (id) => document.getElementById(id);
@@ -251,6 +251,7 @@ function stationHTML(id) {
 
 // ---------- Route planner ----------
 let form = store('si-form') || { start: 'wf', end: 'same', mode: 'drive', limit: 'all', count: 12, hours: 2, dwell: 10 };
+if (!['drive', 'bike'].includes(form.mode)) form.mode = 'drive';
 let picked = store('si-picked') || { start: null, end: null };   // points chosen on the map: { kind, id?, lat, lng, label }
 
 const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
@@ -269,7 +270,7 @@ function plannerHTML() {
     <div class="meta">Orders the stations still to do for the shortest trip.</div>
     <label class="f" for="fStart">Start</label><select class="f" id="fStart" data-f="start">${placeOptions('start')}</select>
     <label class="f" for="fEnd">End</label><select class="f" id="fEnd" data-f="end">${placeOptions('end')}</select>
-    <label class="f">Getting around</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike'], ['walk', 'Walk']])}
+    <label class="f">Getting around</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike']])}
     <label class="f">How much today</label>${seg('limit', [['all', 'All left'], ['count', 'Stations'], ['time', 'Time']])}
     <div class="row">
       ${form.limit === 'count' ? `<div><label class="f" for="fCount">Stations</label><input class="f" id="fCount" data-f="count" type="number" min="1" max="72" inputmode="numeric" value="${form.count}"></div>` : ''}
@@ -295,7 +296,7 @@ function routeHTML() {
   const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
   const nx = nextStop();
   return `<h3>${plan.day ? `Day ${plan.day} of ${plan.of} · ` : ''}${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
-    <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
+    <div class="meta">${{ drive: 'Driving', bike: 'Biking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
       · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
     ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
       : '<div class="note">Every stop on this route is done.</div>'}
@@ -313,7 +314,7 @@ function daysHTML() {
       <span class="t">${i === 0 ? 'fullest' : ''}</span></li>`;
   }).join('');
   return `<h3>${c.days.length} days · about ${fmtMin(c.days.reduce((t, d) => t + d.total, 0))} in all</h3>
-    <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[c.mode]} · ${c.limitText} a day · ${c.dwell} min per stop · ${esc(c.start.label)} → ${esc(c.end.label)}</div>
+    <div class="meta">${{ drive: 'Driving', bike: 'Biking' }[c.mode]} · ${c.limitText} a day · ${c.dwell} min per stop · ${esc(c.start.label)} → ${esc(c.end.label)}</div>
     ${c.toDC ? `<div class="note">${c.mode === 'bike' ? 'Each day ends with the ride to the nearest Metro station; the train to DC isn\'t counted.' : 'Each day ends at its last stop; the drive to DC isn\'t counted.'}</div>` : ''}
     ${c.skipped ? `<div class="note">${c.skipped} station${c.skipped > 1 ? 's are' : ' is'} too far to fit in one day at this limit and ${c.skipped > 1 ? 'are' : 'is'} left out.</div>` : ''}
     <ol class="stops">${rows}</ol>
@@ -538,7 +539,7 @@ async function makePlan(kind) {
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = form.mode !== 'drive' && [form.start, form.end].some((v) => v === 'me' || (v === 'picked' && picked.start?.kind === 'spot') || (v === 'picked' && picked.end?.kind === 'spot'))
-    ? 'Planning… (bike and walk times to a spot take up to 15 s)' : 'Planning…';
+    ? 'Planning… (bike times to a spot take up to 15 s)' : 'Planning…';
   try {
     await routesLoaded;
     const mode = form.mode, dwell = Math.max(0, Number(form.dwell) || 0);
