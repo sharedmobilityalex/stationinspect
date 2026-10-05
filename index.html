@@ -6,65 +6,104 @@
 <title>Station Inspection</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <style>
-  :root { --todo: #ef4444; --done: #16a34a; --ink: #1f2937; --muted: #6b7280; --bg: #fff; }
+  :root { --todo: #ef4444; --done: #16a34a; --blue: #2563eb; --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --bg: #fff; }
   html, body { margin: 0; height: 100%; background: var(--bg); font: 14px/1.4 system-ui, -apple-system, sans-serif; color: var(--ink); }
+  button, select, input { font: inherit; color: inherit; }
   #map { position: absolute; inset: 0; }
-  #top { position: absolute; top: 10px; left: 10px; right: 10px; max-width: 340px; z-index: 2; }
-  .card { background: var(--bg); border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
-  #search { display: flex; flex: 1; min-width: 0; }
+  .card { background: var(--bg); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  [hidden] { display: none !important; }
+
+  /* Top bar: search + locate, route, full screen */
+  #top { position: absolute; top: 10px; left: 10px; right: 10px; max-width: 380px; z-index: 2; }
   #bar { display: flex; gap: 6px; }
-  #full[hidden] { display: none; }
-  #full { flex: none; width: 40px; display: grid; place-items: center; color: #2563eb; }
-  #q { flex: 1; min-width: 0; border: 0; background: none; padding: 9px 10px; font: inherit; font-size: 16px; color: var(--ink); outline: none; }
-  #search:focus-within { box-shadow: 0 0 0 2px #2563eb; }
-  #locate { flex: none; width: 40px; border: 0; border-left: 1px solid #e5e7eb; background: none; cursor: pointer; color: #2563eb;
-            display: grid; place-items: center; border-radius: 0 6px 6px 0; }
+  #search { display: flex; flex: 1; min-width: 0; }
+  #search:focus-within { box-shadow: 0 0 0 2px var(--blue); }
+  #q { flex: 1; min-width: 0; border: 0; background: none; padding: 10px; font-size: 16px; outline: none; }
+  .icon { flex: none; width: 42px; min-height: 42px; border: 0; background: var(--bg); cursor: pointer; color: var(--blue);
+          display: grid; place-items: center; padding: 0; }
+  #locate { border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
   #locate:disabled { color: var(--muted); cursor: wait; }
-  #results { list-style: none; margin: 4px 0 0; padding: 4px 0; max-height: 50vh; overflow-y: auto; }
-  #results li { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  #routeBtn.on { background: var(--blue); color: #fff; }
+  #results { list-style: none; margin: 6px 0 0; padding: 4px 0; max-height: 50vh; overflow-y: auto; }
+  #results li { padding: 9px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
   #results li[aria-selected="true"], #results li:hover { background: #eff6ff; }
   #results .num { color: var(--muted); font-size: 12px; margin-left: auto; }
-  #results .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--todo); align-self: center; }
-  #results .dot.done { background: var(--done); }
   #results .none { color: var(--muted); cursor: default; }
-  #count { display: inline-block; margin-top: 6px; padding: 6px 10px; font-weight: 600; }
+  .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--todo); align-self: center; box-sizing: border-box; }
+  .dot.done { background: #fff; border: 3px solid var(--done); }
+  #count { display: inline-flex; gap: 10px; align-items: center; margin-top: 6px; padding: 6px 10px; font-weight: 600; }
+  #count .lg { font-weight: 400; color: var(--muted); font-size: 12px; display: inline-flex; gap: 4px; align-items: center; }
   #msg { margin-top: 6px; padding: 8px 10px; }
-  #msg a { color: #2563eb; }
-  .me { width: 14px; height: 14px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
-  .pop .away { color: #2563eb; font-size: 12px; margin-bottom: 6px; }
-  #count .note { font-weight: 400; color: var(--muted); }
-  .maplibregl-popup-content { padding: 12px 14px; min-width: 180px; }
-  .pop h3 { margin: 0 0 2px; font-size: 15px; }
-  .pop .meta { color: var(--muted); margin-bottom: 8px; }
-  .pop button { width: 100%; padding: 8px; border: 0; border-radius: 6px; font: inherit; font-weight: 600; cursor: pointer;
-                background: var(--done); color: #fff; }
-  .pop button.undo { background: #e5e7eb; color: var(--ink); }
-    .pop .when { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  #msg a { color: var(--blue); }
+
+  /* Bottom sheet: station details, route planner, route list */
+  #sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; max-height: 62%; overflow-y: auto;
+           border-radius: 12px 12px 0 0; padding: 14px 16px 16px; box-shadow: 0 -2px 10px rgba(0,0,0,.2); background: var(--bg); }
+  @media (min-width: 640px) { #sheet { left: 10px; right: auto; bottom: 10px; width: 360px; border-radius: 12px; } }
+  #sheet h3 { margin: 0 0 2px; font-size: 17px; padding-right: 36px; }
+  #close { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; border: 0; background: none; cursor: pointer;
+           font-size: 22px; color: var(--muted); }
+  .meta { color: var(--muted); margin-bottom: 10px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .away { color: var(--blue); font-size: 13px; margin-bottom: 10px; }
+  .big { display: block; width: 100%; padding: 12px; border: 0; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer;
+         background: var(--done); color: #fff; margin-top: 8px; }
+  .big.undo { background: var(--line); color: var(--ink); }
+  .big.blue { background: var(--blue); }
+  .big.plain { background: none; color: var(--blue); border: 1px solid var(--line); }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  label.f { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
+  select.f, input.f { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 16px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { flex: 1; padding: 10px 0; border: 0; background: #fff; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--blue); color: #fff; font-weight: 600; }
+  ol.stops { margin: 8px 0 0; padding: 0; list-style: none; }
+  ol.stops li { display: flex; gap: 10px; align-items: center; padding: 8px 2px; border-top: 1px solid var(--line); cursor: pointer; }
+  ol.stops .n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--todo); color: #fff; font-size: 12px; font-weight: 700;
+                display: grid; place-items: center; }
+  ol.stops li.done .n { background: #fff; color: var(--done); border: 2px solid var(--done); box-sizing: border-box; }
+  ol.stops li.done .nm { color: var(--muted); text-decoration: line-through; }
+  ol.stops .t { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  .me { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
+  .end { padding: 2px 6px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  #picking { position: absolute; left: 10px; right: 10px; top: 104px; max-width: 360px; z-index: 3; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+  #picking span { flex: 1; }
+  #picking button { border: 0; background: none; color: var(--blue); font-weight: 600; cursor: pointer; padding: 8px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="top">
   <div id="bar">
-  <div id="search" class="card">
-    <input id="q" type="search" placeholder="Search stations" autocomplete="off" enterkeyhint="search"
-           role="combobox" aria-expanded="false" aria-controls="results" aria-label="Search stations">
-    <button id="locate" type="button" title="Nearest station to me" aria-label="Find the nearest station to me">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>
+    <div id="search" class="card">
+      <input id="q" type="search" placeholder="Search stations" autocomplete="off" enterkeyhint="search"
+             role="combobox" aria-expanded="false" aria-controls="results" aria-label="Search stations">
+      <button id="locate" class="icon" type="button" title="Nearest station to me" aria-label="Find the nearest station to me">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>
+        </svg>
+      </button>
+    </div>
+    <button id="routeBtn" class="card icon" type="button" title="Plan a route" aria-label="Plan a route">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>
       </svg>
     </button>
-  </div>
-  <a id="full" class="card" href="./" target="_blank" rel="noopener" title="Open full screen" aria-label="Open the map full screen" hidden>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
-    </svg>
-  </a>
+    <a id="full" class="card icon" href="./" target="_blank" rel="noopener" title="Open full screen" aria-label="Open the map full screen" hidden>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
+      </svg>
+    </a>
   </div>
   <ul id="results" class="card" role="listbox" hidden></ul>
   <div id="msg" class="card" role="status" hidden></div>
   <div id="count" class="card">Loading…</div>
 </div>
+<div id="sheet" role="dialog" aria-live="polite" hidden><button id="close" type="button" aria-label="Close">×</button><div id="body"></div></div>
+<div id="picking" class="card" hidden><span></span><button type="button">Cancel</button></div>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -79,9 +118,18 @@ const FIREBASE = {
   projectId: 'stationinspect-3d591',
   appId: '1:384507805166:web:03350af9d39be4577fe2ff',
 };
+const WITTER = '2064975968599672936';
+// Live travel times for a spot that isn't in routes.json. The main OSRM server answers driving fastest.
+const OSRM = { drive: 'https://router.project-osrm.org', bike: 'https://routing.openstreetmap.de/routed-bike', walk: 'https://routing.openstreetmap.de/routed-foot' };
+const embedded = window.self !== window.top;
 
-let stations = [], done = {}, pending = new Set(), popup, openId = null, away = null;
-const $count = document.getElementById('count');
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch {} return null; };
+
+let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
+let view = null;            // what the sheet shows: { kind: 'station', id } | { kind: 'planner' } | { kind: 'route' }
+let away = null, meMarker, plan = store('si-plan');
 const live = !!FIREBASE.apiKey;
 let col;
 if (live) {
@@ -90,47 +138,340 @@ if (live) {
   col = collection(db, 'stations');
 }
 
+// Inside an embed one finger scrolls the form, two move the map; the full page uses one finger.
 const map = new maplibregl.Map({
   container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
-  center: [-77.09, 38.82], zoom: 12, maxZoom: 19, attributionControl: false,
+  center: [-77.09, 38.82], zoom: 12, maxZoom: 19, attributionControl: false, cooperativeGestures: embedded,
 });
-// The credits start folded into their (i) button; a tap opens them.
-const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openmaptiles.org/">OpenMapTiles</a> · <a href="https://openfreemap.org">OpenFreeMap</a>';
+// The credits start folded into their (i) button; a tap opens them. Bottom corners stack upward,
+// so adding the credits before the zoom buttons keeps (i) underneath.
+const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openmaptiles.org/">OpenMapTiles</a> · <a href="https://openfreemap.org">OpenFreeMap</a> · Routing: <a href="https://project-osrm.org">OSRM</a>';
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: CREDITS }), 'bottom-right');
 document.querySelector('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+if (embedded) $('full').hidden = false;
 
-function geojson() {
+// ---------- Map layers ----------
+function stationData() {
+  const order = plan ? Object.fromEntries(plan.stops.map((id, i) => [id, i + 1])) : {};
   return { type: 'FeatureCollection', features: stations.map((s) => ({
     type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-    properties: { id: s.id, done: !!done[s.id] } })) };
+    properties: { id: s.id, name: s.name, done: !!done[s.id], n: order[s.id] || 0, sel: view?.kind === 'station' && view.id === s.id } })) };
+}
+
+function routeData() {
+  if (!plan) return { type: 'FeatureCollection', features: [] };
+  const pts = [plan.start, ...plan.stops.map((id) => byId[id]), plan.end].map((p) => [p.lng, p.lat]);
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} }] };
+}
+
+function addLayers() {
+  map.addSource('route', { type: 'geojson', data: routeData() });
+  map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#2563eb', 'line-width': 3, 'line-opacity': .7, 'line-dasharray': [2, 1.5] } });
+  map.addSource('st', { type: 'geojson', data: stationData() });
+  // To do = filled red; done = white ring with a thick green edge, so the two differ by shape as well as colour.
+  // With a route planned, stations off the route fade back and route stops grow to carry their number.
+  const r = ['interpolate', ['linear'], ['zoom'], 11, ['case', ['>', ['get', 'n'], 0], 9, 5], 16, ['case', ['>', ['get', 'n'], 0], 13, 10]];
+  map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
+    'circle-radius': r,
+    'circle-color': ['case', ['get', 'done'], '#ffffff', '#ef4444'],
+    'circle-stroke-color': ['case', ['get', 'sel'], '#2563eb', ['get', 'done'], '#16a34a', '#ffffff'],
+    'circle-stroke-width': ['case', ['get', 'sel'], 4, ['get', 'done'], 3.5, 1.5],
+    'circle-opacity': ['case', ['all', ['to-boolean', ['global-state', 'planned']], ['==', ['get', 'n'], 0]], .35, 1],
+    'circle-stroke-opacity': ['case', ['all', ['to-boolean', ['global-state', 'planned']], ['==', ['get', 'n'], 0]], .35, 1] } });
+  map.addLayer({ id: 'st-n', type: 'symbol', source: 'st', filter: ['>', ['get', 'n'], 0], layout: {
+    'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true },
+    paint: { 'text-color': ['case', ['get', 'done'], '#16a34a', '#ffffff'] } });
+  // Names appear once zoomed in close enough to read them.
+  map.addLayer({ id: 'st-name', type: 'symbol', source: 'st', minzoom: 15, layout: {
+    'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-offset': [0, 1.4], 'text-anchor': 'top', 'text-max-width': 9 },
+    paint: { 'text-color': '#1f2937', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } });
 }
 
 function refresh() {
-  map.getSource('st')?.setData(geojson());
+  if (map.getSource('st')) {
+    map.setGlobalStateProperty('planned', !!plan);
+    map.getSource('st').setData(stationData());
+    map.getSource('route').setData(routeData());
+  }
+  drawEnds();
+  $('routeBtn').classList.toggle('on', !!plan);
   if (!stations.length) return;
   const n = stations.filter((s) => done[s.id]).length;
-  $count.innerHTML = `${n} / ${stations.length} done` + (live ? '' : ' <span class="note">(demo, not saved)</span>');
-  if (openId) renderPopup(openId);
+  $('count').innerHTML = `${n} / ${stations.length} done <span class="lg"><span class="dot"></span>to do <span class="dot done"></span>done</span>`
+    + (live ? '' : ' <span class="lg">(demo, not saved)</span>');
+  if (view) render();
 }
 
-const esc = (t) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+// ---------- Sheet ----------
+function show(v) { view = v; render(); refresh(); }
+function hideSheet() { view = null; $('sheet').hidden = true; refresh(); }
+$('close').onclick = hideSheet;
 
-function renderPopup(id) {
-  const s = stations.find((x) => x.id === id);
-  const d = done[id];
+function render() {
+  $('sheet').hidden = false;
+  const b = $('body');
+  if (view.kind === 'station') b.innerHTML = stationHTML(view.id);
+  else if (view.kind === 'planner') b.innerHTML = plannerHTML();
+  else if (view.kind === 'route') b.innerHTML = routeHTML();
+  wire(b);
+}
+
+function nextStop(after) {
+  if (!plan) return null;
+  return plan.stops.find((id) => id !== after && !done[id]) || null;
+}
+
+function stationHTML(id) {
+  const s = byId[id], d = done[id];
   const when = pending.has(id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
-  const el = document.createElement('div');
-  el.className = 'pop';
-  el.innerHTML = `<h3>${esc(s.name)}</h3>
-    <div class="meta">Station ${s.num} · ${s.docks} docks</div>
+  const k = plan ? plan.stops.indexOf(id) : -1;
+  const nx = nextStop(id);
+  return `<h3>${esc(s.name)}</h3>
+    <div class="meta">Station ${esc(s.num)} · ${s.docks} docks${k >= 0 ? ` · Stop ${k + 1} of ${plan.stops.length}` : ''}</div>
     ${away?.id === id ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
-    <button class="${d ? 'undo' : ''}">${d ? 'Undo' : 'Mark as done'}</button>
-    ${when ? `<div class="when">${when}</div>` : ''}`;
-  el.querySelector('button').onclick = () => toggle(s);
-  popup.setDOMContent(el);
+    <button class="big ${d ? 'undo' : ''}" data-act="toggle">${d ? 'Undo' : 'Mark as done'}</button>
+    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">Next stop: ${esc(byId[nx].name)} →</button>` : ''}
+    ${plan && !nx && k >= 0 ? `<div class="note">That's every stop on this route. Head to ${esc(plan.end.label)}.</div>` : ''}
+    ${when ? `<div class="note">${when}</div>` : ''}`;
 }
 
+// ---------- Route planner ----------
+let form = store('si-form') || { start: 'wf', end: 'same', mode: 'drive', limit: 'all', count: 12, hours: 2, dwell: 10 };
+let picked = store('si-picked') || { start: null, end: null };   // points chosen on the map: { kind, id?, lat, lng, label }
+
+const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
+
+function placeOptions(which) {
+  const opts = [['wf', 'Witter Field'], ['cp', 'Cleveland Park (Metro)'], ['me', 'My location'], ['pick', 'Choose on map…']];
+  if (which === 'end') opts.unshift(['same', 'Same as start']);
+  const p = picked[which];
+  if (p) opts.splice(opts.length - 1, 0, ['picked', p.label]);
+  return opts.map(([v, t]) => `<option value="${v}"${form[which] === v ? ' selected' : ''}>${esc(t)}</option>`).join('');
+}
+
+function plannerHTML() {
+  const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-seg="${k}" data-v="${v}" aria-pressed="${form[k] === v}">${t}</button>`).join('')}</div>`;
+  return `<h3>Plan a route</h3>
+    <div class="meta">Orders the stations still to do for the shortest trip.</div>
+    <label class="f" for="fStart">Start</label><select class="f" id="fStart" data-f="start">${placeOptions('start')}</select>
+    <label class="f" for="fEnd">End</label><select class="f" id="fEnd" data-f="end">${placeOptions('end')}</select>
+    <label class="f">Getting around</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike'], ['walk', 'Walk']])}
+    <label class="f">How much today</label>${seg('limit', [['all', 'All left'], ['count', 'Stations'], ['time', 'Time']])}
+    <div class="row">
+      ${form.limit === 'count' ? `<div><label class="f" for="fCount">Stations</label><input class="f" id="fCount" data-f="count" type="number" min="1" max="72" inputmode="numeric" value="${form.count}"></div>` : ''}
+      ${form.limit === 'time' ? `<div><label class="f" for="fHours">Hours</label><input class="f" id="fHours" data-f="hours" type="number" min="0.5" max="12" step="0.5" inputmode="decimal" value="${form.hours}"></div>` : ''}
+      <div><label class="f" for="fDwell">Minutes at each stop</label><input class="f" id="fDwell" data-f="dwell" type="number" min="0" max="60" inputmode="numeric" value="${form.dwell}"></div>
+    </div>
+    <button class="big blue" data-act="plan">Plan route</button>
+    ${plan ? '<button class="big plain" data-act="showroute">Back to current route</button>' : ''}`;
+}
+
+function routeHTML() {
+  const left = plan.stops.filter((id) => !done[id]).length;
+  let t = 0;
+  const rows = plan.stops.map((id, i) => {
+    t += plan.legs[i] + (i ? plan.dwell : 0);
+    return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
+  }).join('');
+  const nx = nextStop();
+  return `<h3>${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
+    <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
+      · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
+    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
+      : '<div class="note">Every stop on this route is done.</div>'}
+    <ol class="stops">${rows}</ol>
+    <div class="row"><button class="big plain" data-act="planner">Change</button><button class="big plain" data-act="clear">Clear route</button></div>
+    <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
+}
+
+function wire(b) {
+  b.querySelectorAll('[data-act]').forEach((el) => el.onclick = () => act(el.dataset.act, el.dataset.id));
+  b.querySelectorAll('[data-seg]').forEach((el) => el.onclick = () => { form[el.dataset.seg] = el.dataset.v; store('si-form', form); render(); });
+  b.querySelectorAll('[data-f]').forEach((el) => el.onchange = () => {
+    const k = el.dataset.f;
+    if (el.value === 'pick') return startPicking(k);
+    form[k] = el.tagName === 'INPUT' ? Number(el.value) : el.value;
+    store('si-form', form);
+  });
+  b.querySelectorAll('ol.stops li').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
+}
+
+function act(a, id) {
+  if (a === 'toggle') toggle(byId[view.id]);
+  else if (a === 'go') openStation(id, true);
+  else if (a === 'planner') show({ kind: 'planner' });
+  else if (a === 'showroute') show({ kind: 'route' });
+  else if (a === 'clear') { plan = null; store('si-plan', null); hideSheet(); }
+  else if (a === 'plan') makePlan();
+}
+
+$('routeBtn').onclick = () => show({ kind: plan ? 'route' : 'planner' });
+
+// Choosing a start or end on the map: tap a station dot or any spot.
+let picking = null;
+function startPicking(which) {
+  picking = which;
+  $('sheet').hidden = true;
+  $('picking').hidden = false;
+  $('picking').querySelector('span').textContent = `Tap a station or any spot for the ${which}.`;
+}
+$('picking').querySelector('button').onclick = () => { picking = null; $('picking').hidden = true; render(); };
+function finishPicking(p) {
+  picked[picking] = p;
+  form[picking] = 'picked';
+  store('si-picked', picked);
+  store('si-form', form);
+  picking = null;
+  $('picking').hidden = true;
+  show({ kind: 'planner' });
+}
+
+// ---------- Travel times ----------
+const routesLoaded = fetch('routes.json').then((r) => r.json()).then((d) => { routes = d; return d; });
+
+function meters(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+const fmtDist = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m away` : `${(m / 1609.34).toFixed(1)} mi away`;
+
+// Minutes per straight-line metre for a mode, from the baked table: the fallback when routing can't answer.
+function pace(mode) {
+  const m = routes.min[mode], ratios = [];
+  for (let i = 0; i < stations.length; i += 3) for (let j = 1; j < stations.length; j += 5) {
+    const d = meters(byId[routes.ids[i]], byId[routes.ids[j]]);
+    if (d > 300) ratios.push(m[i][j] / d);
+  }
+  ratios.sort((a, b) => a - b);
+  return ratios[ratios.length >> 1];
+}
+
+// Resolve a start/end choice to a point, asking for the device location when needed.
+function place(which) {
+  const v = which === 'end' && form.end === 'same' ? form.start : form[which];
+  const src = which === 'end' && form.end === 'same' ? 'start' : which;
+  if (v === 'wf') return Promise.resolve({ kind: 'station', id: WITTER, lat: byId[WITTER].lat, lng: byId[WITTER].lng, label: 'Witter Field' });
+  if (v === 'cp') { const a = routes.anchors[0]; return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: a.name }); }
+  if (v === 'picked' && picked[src]) return Promise.resolve(picked[src]);
+  return getLocation().then((me) => ({ kind: 'spot', lat: me.lat, lng: me.lng, label: 'Your location' }));
+}
+
+// Travel-time row and column for one point against every stop, in matrix order.
+async function linkPoint(p, mode) {
+  const idx = p.kind === 'station' || p.kind === 'anchor' ? routes.ids.indexOf(p.id) : -1;
+  if (idx >= 0) return { to: routes.min[mode][idx], from: routes.min[mode].map((r) => r[idx]), estimated: false };
+  const pts = [p, ...routes.ids.map((id) => byId[id] || routes.anchors.find((a) => a.id === id))];
+  const coords = pts.map((q) => `${q.lng.toFixed(6)},${q.lat.toFixed(6)}`).join(';');
+  const url = (side) => `${OSRM[mode]}/table/v1/driving/${coords}?${side}=0&annotations=duration`;
+  try {
+    const get = (side) => fetch(url(side), { signal: AbortSignal.timeout(15000) }).then((r) => r.json());
+    const [a, b] = await Promise.all([get('sources'), get('destinations')]);
+    if (a.code !== 'Ok' || b.code !== 'Ok') throw new Error('routing');
+    return { to: a.durations[0].slice(1).map((s) => s / 60), from: b.durations.slice(1).map((r) => r[0] / 60), estimated: false };
+  } catch {
+    const k = pace(mode), est = pts.slice(1).map((q) => meters(p, q) * k);
+    return { to: est, from: est, estimated: true };
+  }
+}
+
+// Picks stations and orders them: cheapest insertion between the fixed start and end, then
+// 2-opt and single-stop moves until nothing shortens the trip. Times may differ by direction.
+function solve(cand, T, s, e, limit, dwell) {
+  const route = [];
+  const cost = (r) => { let c = 0, prev = s; for (const x of r) { c += T(prev, x); prev = x; } return c + T(prev, e); };
+  const left = new Set(cand);
+  while (left.size) {
+    let best = null;
+    for (const c of left) for (let i = 0; i <= route.length; i++) {
+      const a = i ? route[i - 1] : s, b = i < route.length ? route[i] : e;
+      const inc = T(a, c) + T(c, b) - T(a, b);
+      if (!best || inc < best.inc) best = { c, i, inc };
+    }
+    if (limit.count && route.length >= limit.count) break;
+    if (limit.minutes && cost(route) + route.length * dwell + best.inc + dwell > limit.minutes) break;
+    route.splice(best.i, 0, best.c);
+    left.delete(best.c);
+  }
+  let r = route, cur = cost(r), better = true;
+  while (better) {
+    better = false;
+    for (let i = 0; i < r.length - 1; i++) for (let j = i + 1; j < r.length; j++) {
+      const t = [...r.slice(0, i), ...r.slice(i, j + 1).reverse(), ...r.slice(j + 1)];
+      const c = cost(t);
+      if (c < cur - 1e-9) { r = t; cur = c; better = true; }
+    }
+    for (let i = 0; i < r.length; i++) for (let j = 0; j <= r.length - 1; j++) {
+      if (i === j) continue;
+      const t = r.slice(); const [x] = t.splice(i, 1); t.splice(j, 0, x);
+      const c = cost(t);
+      if (c < cur - 1e-9) { r = t; cur = c; better = true; }
+    }
+  }
+  return r;
+}
+
+async function makePlan() {
+  const btn = $('body').querySelector('[data-act="plan"]');
+  btn.disabled = true;
+  btn.textContent = form.mode !== 'drive' && [form.start, form.end].some((v) => v === 'me' || (v === 'picked' && picked.start?.kind === 'spot') || (v === 'picked' && picked.end?.kind === 'spot'))
+    ? 'Planning… (bike and walk times to a spot take up to 15 s)' : 'Planning…';
+  try {
+    await routesLoaded;
+    const mode = form.mode, dwell = Math.max(0, Number(form.dwell) || 0);
+    const [ps, pe] = await Promise.all([place('start'), place('end')]);
+    const [ls, le] = await Promise.all([linkPoint(ps, mode), linkPoint(pe, mode)]);
+    const M = routes.min[mode], n = routes.ids.length, S = n, E = n + 1;
+    // Nodes: matrix indices 0..n-1, then S and E for the start and end points.
+    const T = (a, b) => {
+      if (a === b) return 0;
+      if (a === S && b === E) return ls.to[routes.ids.indexOf(pe.id)] ?? meters(ps, pe) * pace(mode);
+      if (a === S) return ls.to[b];
+      if (b === E) return le.from[a];
+      if (a === E || b === S) return 1e6;
+      return M[a][b];
+    };
+    const cand = stations.filter((st) => !done[st.id]).map((st) => routes.ids.indexOf(st.id));
+    const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : form.limit === 'time' ? { minutes: form.hours * 60 } : {};
+    const order = solve(cand, T, S, E, limit, dwell);
+    if (!order.length) throw new Error(cand.length ? 'Not enough time for even one stop. Try more time.' : 'Every station is already done.');
+    const path = [S, ...order, E], legs = [];
+    for (let i = 1; i < path.length; i++) legs.push(T(path[i - 1], path[i]));
+    const travel = legs.reduce((a, b) => a + b, 0);
+    plan = { mode, dwell, start: ps, end: pe, stops: order.map((i) => routes.ids[i]), legs, travel,
+             total: travel + order.length * dwell, estimated: ls.estimated || le.estimated, made: Date.now() };
+    store('si-plan', plan);
+    show({ kind: 'route' });
+    fitPlan();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = 'Plan route';
+    say(esc(err.message === 'location' ? 'Could not get your location for the route. Pick a place on the map instead.' : err.message));
+  }
+}
+
+function fitPlan() {
+  const b = new maplibregl.LngLatBounds();
+  [plan.start, plan.end, ...plan.stops.map((id) => byId[id])].forEach((p) => b.extend([p.lng, p.lat]));
+  map.fitBounds(b, { padding: padding(), maxZoom: 16 });
+}
+
+// Start/end flags.
+const ends = {};
+function drawEnds() {
+  for (const k of ['start', 'end']) {
+    const p = plan?.[k];
+    if (!p) { ends[k]?.remove(); continue; }
+    const same = plan.start.lat === plan.end.lat && plan.start.lng === plan.end.lng;
+    if (k === 'end' && same) { ends[k]?.remove(); continue; }
+    ends[k] ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'end' }), anchor: 'bottom', offset: [0, -12] });
+    ends[k].getElement().textContent = same ? 'Start · End' : k === 'start' ? 'Start' : 'End';
+    ends[k].setLngLat([p.lng, p.lat]).addTo(map);
+  }
+}
+
+// ---------- Done state ----------
 function toggle(s) {
   const next = !done[s.id];
   if (!live) {
@@ -152,20 +493,57 @@ if (live) {
       if (d.metadata.hasPendingWrites) pending.add(d.id);
     });
     refresh();
-  }, () => { $count.textContent = 'Could not load the done list'; });
+  }, () => { $('count').textContent = 'Could not load the done list'; });
+}
+
+// ---------- Opening stations ----------
+// Keeps the station clear of the top bar and the bottom sheet.
+function padding() {
+  const sheet = $('sheet').hidden ? 0 : $('sheet').offsetHeight;
+  const wide = innerWidth >= 640;
+  return { top: 70, bottom: Math.min((wide ? 20 : sheet) + 30, innerHeight * .6), left: (wide && sheet ? 380 : 30), right: 50 };
+}
+
+// Centres a point in the clear part of the map. An offset, unlike padding, doesn't stay on the map afterwards.
+function focus(s, zoom) {
+  const pad = padding();
+  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2] });
 }
 
 function openStation(id, fly) {
-  const s = stations.find((x) => x.id === id);
-  openId = id;
-  if (fly) map.flyTo({ center: [s.lng, s.lat], zoom: Math.max(map.getZoom(), 16) });
-  popup.setLngLat([s.lng, s.lat]);
-  renderPopup(id);
-  popup.addTo(map);
+  show({ kind: 'station', id });
+  const s = byId[id];
+  if (fly) return focus(s, Math.max(map.getZoom(), 15.5));
+  const pt = map.project([s.lng, s.lat]), pad = padding();
+  if (pt.y > innerHeight - pad.bottom || pt.x < pad.left) focus(s);
 }
 
-// ---- Search by name or number ----
-const $q = document.getElementById('q'), $results = document.getElementById('results'), $msg = document.getElementById('msg');
+// Taps count when they land near a dot, not only on it; the closest dot wins.
+map.on('click', (e) => {
+  if (!map.getLayer('st')) return;
+  const p = e.point, r = 22;
+  const near = map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] });
+  let best = null;
+  for (const f of near) {
+    const q = map.project(f.geometry.coordinates), d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d <= r && (!best || d < best.d)) best = { id: f.properties.id, d };
+  }
+  if (picking) {
+    if (best) { const s = byId[best.id]; return finishPicking({ kind: 'station', id: s.id, lat: s.lat, lng: s.lng, label: s.name }); }
+    return finishPicking({ kind: 'spot', lat: e.lngLat.lat, lng: e.lngLat.lng, label: 'Spot on the map' });
+  }
+  if (best) openStation(best.id);
+  else if (view?.kind === 'station') hideSheet();
+});
+map.on('mousemove', (e) => {
+  if (!map.getLayer('st')) return;
+  const p = e.point, r = 12;
+  map.getCanvas().style.cursor = picking ? 'crosshair'
+    : map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] }).length ? 'pointer' : '';
+});
+
+// ---------- Search by name or number ----------
+const $q = $('q'), $results = $('results'), $msg = $('msg');
 const norm = (t) => t.toLowerCase().replace(/[.,/&]/g, ' ').replace(/\bmount\b/g, 'mt').replace(/\s+/g, ' ').trim();
 let hits = [], sel = -1;
 
@@ -180,9 +558,9 @@ function search() {
   drawResults(words.length > 0);
 }
 
-function drawResults(show) {
-  $results.hidden = !show;
-  $q.setAttribute('aria-expanded', String(show));
+function drawResults(showList) {
+  $results.hidden = !showList;
+  $q.setAttribute('aria-expanded', String(showList));
   $results.innerHTML = hits.length ? hits.map((s, i) => `<li role="option" id="r${i}" data-id="${s.id}" aria-selected="${i === sel}">
       <span class="dot${done[s.id] ? ' done' : ''}"></span><span>${esc(s.name)}</span><span class="num">${esc(s.num)}</span></li>`).join('')
     : '<li class="none">No matching station</li>';
@@ -193,6 +571,7 @@ function pick(id) {
   $q.value = '';
   drawResults(false);
   $q.blur();
+  if (picking) { const s = byId[id]; return finishPicking({ kind: 'station', id: s.id, lat: s.lat, lng: s.lng, label: s.name }); }
   openStation(id, true);
 }
 
@@ -203,7 +582,7 @@ $q.addEventListener('keydown', (e) => {
     e.preventDefault();
     sel = (sel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length;
     drawResults(true);
-    document.getElementById(`r${sel}`)?.scrollIntoView({ block: 'nearest' });
+    $(`r${sel}`)?.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter' && sel >= 0) {
     pick(hits[sel].id);
   } else if (e.key === 'Escape') {
@@ -214,74 +593,62 @@ $q.addEventListener('keydown', (e) => {
 $results.addEventListener('click', (e) => { const li = e.target.closest('li[data-id]'); if (li) pick(li.dataset.id); });
 document.addEventListener('click', (e) => { if (!e.target.closest('#top')) drawResults(false); });
 
-// ---- Nearest station to this device ----
-const $locate = document.getElementById('locate');
-// Inside an embed (e.g. a Tally form), offer the map on its own page, which fills a phone screen.
-if (window.self !== window.top) document.getElementById('full').hidden = false;
-let meMarker;
-
-function meters(a, b) {
-  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6371000 * Math.asin(Math.sqrt(h));
-}
-const fmtDist = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m away` : `${(m / 1609.34).toFixed(1)} mi away`;
-
+// ---------- Device location ----------
 function say(html) {
   $msg.innerHTML = html;
   $msg.hidden = !html;
 }
 
-$locate.addEventListener('click', () => {
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { say('This browser cannot share its location.'); return reject(new Error('location')); }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      meMarker ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'me' }) });
+      meMarker.setLngLat([me.lng, me.lat]).addTo(map);
+      resolve(me);
+    }, (err) => {
+      // Inside an embed the browser may refuse location outright; the full page can still ask.
+      const full = embedded ? ` <a href="${location.href}" target="_blank" rel="noopener">Open the map on its own page</a> to use your location.` : '';
+      say((err.code === err.PERMISSION_DENIED
+        ? `Location is blocked here.${full || ' On iPhone: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using the App. Then in Safari tap <b>aA</b> → Website Settings → Location → Allow, and try again.'}`
+        : 'Could not get your location. Try again in a moment.')
+        + `<br><small style="color:var(--muted)">(${err.code}: ${esc(err.message || 'no detail')}${embedded ? ', embedded' : ''})</small>`);
+      reject(new Error('location'));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+  });
+}
+
+$('locate').addEventListener('click', async () => {
   say('');
-  if (!navigator.geolocation) return say('This browser cannot share its location.');
-  $locate.disabled = true;
-  navigator.geolocation.getCurrentPosition((pos) => {
-    $locate.disabled = false;
-    const me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  $('locate').disabled = true;
+  try {
+    const me = await getLocation();
     let best;
     for (const s of stations) { const m = meters(me, s); if (!best || m < best.m) best = { id: s.id, m }; }
     away = best;
-    meMarker ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'me' }) });
-    meMarker.setLngLat([me.lng, me.lat]).addTo(map);
-    const s = stations.find((x) => x.id === best.id);
-    const b = new maplibregl.LngLatBounds([me.lng, me.lat], [me.lng, me.lat]).extend([s.lng, s.lat]);
-    map.fitBounds(b, { padding: { top: 140, bottom: 60, left: 60, right: 60 }, maxZoom: 17 });
+    const s = byId[best.id];
     openStation(best.id);
-  }, (err) => {
-    $locate.disabled = false;
-    // Inside an embed the browser may refuse location outright; the full page can still ask.
-    const full = window.self !== window.top
-      ? ` <a href="${location.href}" target="_blank" rel="noopener">Open the map on its own page</a> to use your location.` : '';
-    say((err.code === err.PERMISSION_DENIED
-      ? `Location is blocked here.${full || ' On iPhone: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using the App. Then in Safari tap <b>aA</b> → Website Settings → Location → Allow, and try again.'}`
-      : 'Could not get your location. Try again in a moment.')
-      + `<br><small style="color:var(--muted)">(${err.code}: ${esc(err.message || 'no detail')}${window.self !== window.top ? ', embedded' : ''})</small>`);
-  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    map.fitBounds(new maplibregl.LngLatBounds([me.lng, me.lat], [me.lng, me.lat]).extend([s.lng, s.lat]), { padding: padding(), maxZoom: 17 });
+  } catch {} finally { $('locate').disabled = false; }
 });
 
+// ---------- Start ----------
 // Stations load alongside the map, so search works before the tiles finish.
 const stationsLoaded = fetch('stations.json').then((r) => r.json()).then((list) => {
   stations = list;
+  byId = Object.fromEntries(list.map((s) => [s.id, s]));
+  if (plan && !plan.stops.every((id) => byId[id])) { plan = null; store('si-plan', null); }
   refresh();
   if ($q.value) search();
   return list;
 });
 map.on('load', async () => {
   await stationsLoaded;
-  map.addSource('st', { type: 'geojson', data: geojson() });
-  map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
-    'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10],
-    'circle-color': ['case', ['get', 'done'], '#16a34a', '#ef4444'],
-    'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+  addLayers();
   const b = new maplibregl.LngLatBounds();
   stations.forEach((s) => b.extend([s.lng, s.lat]));
   map.fitBounds(b, { padding: { top: 110, bottom: 30, left: 30, right: 30 }, duration: 0 });
-  popup = new maplibregl.Popup({ offset: 10, maxWidth: '260px' });
-  popup.on('close', () => { openId = null; });
-  map.on('click', 'st', (e) => openStation(e.features[0].properties.id));
-  map.on('mouseenter', 'st', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'st', () => { map.getCanvas().style.cursor = ''; });
   refresh();
 });
 </script>
