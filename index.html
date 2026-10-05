@@ -9,8 +9,26 @@
   :root { --todo: #ef4444; --done: #16a34a; --ink: #1f2937; --muted: #6b7280; --bg: #fff; }
   html, body { margin: 0; height: 100%; background: var(--bg); font: 14px/1.4 system-ui, -apple-system, sans-serif; color: var(--ink); }
   #map { position: absolute; inset: 0; }
-  #count { position: absolute; top: 10px; left: 10px; z-index: 1; background: var(--bg); padding: 6px 10px; border-radius: 6px;
-           box-shadow: 0 1px 4px rgba(0,0,0,.2); font-weight: 600; }
+  #top { position: absolute; top: 10px; left: 10px; right: 10px; max-width: 340px; z-index: 2; }
+  .card { background: var(--bg); border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  #search { display: flex; }
+  #q { flex: 1; min-width: 0; border: 0; background: none; padding: 9px 10px; font: inherit; font-size: 16px; color: var(--ink); outline: none; }
+  #search:focus-within { box-shadow: 0 0 0 2px #2563eb; }
+  #locate { flex: none; width: 40px; border: 0; border-left: 1px solid #e5e7eb; background: none; cursor: pointer; color: #2563eb;
+            display: grid; place-items: center; border-radius: 0 6px 6px 0; }
+  #locate:disabled { color: var(--muted); cursor: wait; }
+  #results { list-style: none; margin: 4px 0 0; padding: 4px 0; max-height: 50vh; overflow-y: auto; }
+  #results li { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  #results li[aria-selected="true"], #results li:hover { background: #eff6ff; }
+  #results .num { color: var(--muted); font-size: 12px; margin-left: auto; }
+  #results .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--todo); align-self: center; }
+  #results .dot.done { background: var(--done); }
+  #results .none { color: var(--muted); cursor: default; }
+  #count { display: inline-block; margin-top: 6px; padding: 6px 10px; font-weight: 600; }
+  #msg { margin-top: 6px; padding: 8px 10px; }
+  #msg a { color: #2563eb; }
+  .me { width: 14px; height: 14px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
+  .pop .away { color: #2563eb; font-size: 12px; margin-bottom: 6px; }
   #count .note { font-weight: 400; color: var(--muted); }
   .maplibregl-popup-content { padding: 12px 14px; min-width: 180px; }
   .pop h3 { margin: 0 0 2px; font-size: 15px; }
@@ -23,7 +41,20 @@
 </head>
 <body>
 <div id="map"></div>
-<div id="count">Loading…</div>
+<div id="top">
+  <div id="search" class="card">
+    <input id="q" type="search" placeholder="Search by station name or number" autocomplete="off" enterkeyhint="search"
+           role="combobox" aria-expanded="false" aria-controls="results" aria-label="Search stations">
+    <button id="locate" type="button" title="Nearest station to me" aria-label="Find the nearest station to me">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/>
+      </svg>
+    </button>
+  </div>
+  <ul id="results" class="card" role="listbox" hidden></ul>
+  <div id="msg" class="card" role="status" hidden></div>
+  <div id="count" class="card">Loading…</div>
+</div>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -39,7 +70,7 @@ const FIREBASE = {
   appId: '1:384507805166:web:03350af9d39be4577fe2ff',
 };
 
-let stations = [], done = {}, pending = new Set(), popup, openId = null;
+let stations = [], done = {}, pending = new Set(), popup, openId = null, away = null;
 const $count = document.getElementById('count');
 const live = !!FIREBASE.apiKey;
 let col;
@@ -53,7 +84,7 @@ const map = new maplibregl.Map({
   container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
   center: [-77.09, 38.82], zoom: 12, maxZoom: 19,
 });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
 function geojson() {
   return { type: 'FeatureCollection', features: stations.map((s) => ({
@@ -79,6 +110,7 @@ function renderPopup(id) {
   el.className = 'pop';
   el.innerHTML = `<h3>${esc(s.name)}</h3>
     <div class="meta">Station ${s.num} · ${s.docks} docks</div>
+    ${away?.id === id ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
     <button class="${d ? 'undo' : ''}">${d ? 'Undo' : 'Mark as done'}</button>
     ${when ? `<div class="when">${when}</div>` : ''}`;
   el.querySelector('button').onclick = () => toggle(s);
@@ -109,9 +141,117 @@ if (live) {
   }, () => { $count.textContent = 'Could not load the done list'; });
 }
 
-const stationsLoaded = fetch('stations.json').then((r) => r.json());
+function openStation(id, fly) {
+  const s = stations.find((x) => x.id === id);
+  openId = id;
+  if (fly) map.flyTo({ center: [s.lng, s.lat], zoom: Math.max(map.getZoom(), 16) });
+  popup.setLngLat([s.lng, s.lat]);
+  renderPopup(id);
+  popup.addTo(map);
+}
+
+// ---- Search by name or number ----
+const $q = document.getElementById('q'), $results = document.getElementById('results'), $msg = document.getElementById('msg');
+const norm = (t) => t.toLowerCase().replace(/[.,/&]/g, ' ').replace(/\bmount\b/g, 'mt').replace(/\s+/g, ' ').trim();
+let hits = [], sel = -1;
+
+function search() {
+  say('');
+  const words = norm($q.value).split(' ').filter(Boolean);
+  hits = !words.length ? [] : stations.filter((s) => {
+    const hay = `${norm(s.name)} ${s.num}`;
+    return words.every((w) => hay.includes(w));
+  }).slice(0, 8);
+  sel = hits.length ? 0 : -1;
+  drawResults(words.length > 0);
+}
+
+function drawResults(show) {
+  $results.hidden = !show;
+  $q.setAttribute('aria-expanded', String(show));
+  $results.innerHTML = hits.length ? hits.map((s, i) => `<li role="option" id="r${i}" data-id="${s.id}" aria-selected="${i === sel}">
+      <span class="dot${done[s.id] ? ' done' : ''}"></span><span>${esc(s.name)}</span><span class="num">${esc(s.num)}</span></li>`).join('')
+    : '<li class="none">No matching station</li>';
+  if (sel >= 0) $q.setAttribute('aria-activedescendant', `r${sel}`); else $q.removeAttribute('aria-activedescendant');
+}
+
+function pick(id) {
+  $q.value = '';
+  drawResults(false);
+  $q.blur();
+  openStation(id, true);
+}
+
+$q.addEventListener('input', search);
+$q.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!hits.length) return;
+    e.preventDefault();
+    sel = (sel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length;
+    drawResults(true);
+    document.getElementById(`r${sel}`)?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' && sel >= 0) {
+    pick(hits[sel].id);
+  } else if (e.key === 'Escape') {
+    $q.value = '';
+    drawResults(false);
+  }
+});
+$results.addEventListener('click', (e) => { const li = e.target.closest('li[data-id]'); if (li) pick(li.dataset.id); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#top')) drawResults(false); });
+
+// ---- Nearest station to this device ----
+const $locate = document.getElementById('locate');
+let meMarker;
+
+function meters(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+const fmtDist = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m away` : `${(m / 1609.34).toFixed(1)} mi away`;
+
+function say(html) {
+  $msg.innerHTML = html;
+  $msg.hidden = !html;
+}
+
+$locate.addEventListener('click', () => {
+  say('');
+  if (!navigator.geolocation) return say('This browser cannot share its location.');
+  $locate.disabled = true;
+  navigator.geolocation.getCurrentPosition((pos) => {
+    $locate.disabled = false;
+    const me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    let best;
+    for (const s of stations) { const m = meters(me, s); if (!best || m < best.m) best = { id: s.id, m }; }
+    away = best;
+    meMarker ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'me' }) });
+    meMarker.setLngLat([me.lng, me.lat]).addTo(map);
+    const s = stations.find((x) => x.id === best.id);
+    const b = new maplibregl.LngLatBounds([me.lng, me.lat], [me.lng, me.lat]).extend([s.lng, s.lat]);
+    map.fitBounds(b, { padding: { top: 140, bottom: 60, left: 60, right: 60 }, maxZoom: 17 });
+    openStation(best.id);
+  }, (err) => {
+    $locate.disabled = false;
+    // Inside an embed the browser may refuse location outright; the full page can still ask.
+    const full = window.self !== window.top
+      ? ` <a href="${location.href}" target="_blank" rel="noopener">Open the map on its own page</a> to use your location.` : '';
+    say(err.code === err.PERMISSION_DENIED
+      ? `Location is blocked here.${full || ' Allow location for this site in your browser settings and try again.'}`
+      : 'Could not get your location. Try again in a moment.');
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+});
+
+// Stations load alongside the map, so search works before the tiles finish.
+const stationsLoaded = fetch('stations.json').then((r) => r.json()).then((list) => {
+  stations = list;
+  refresh();
+  if ($q.value) search();
+  return list;
+});
 map.on('load', async () => {
-  stations = await stationsLoaded;
+  await stationsLoaded;
   map.addSource('st', { type: 'geojson', data: geojson() });
   map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10],
@@ -119,15 +259,10 @@ map.on('load', async () => {
     'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
   const b = new maplibregl.LngLatBounds();
   stations.forEach((s) => b.extend([s.lng, s.lat]));
-  map.fitBounds(b, { padding: 40, duration: 0 });
+  map.fitBounds(b, { padding: { top: 110, bottom: 30, left: 30, right: 30 }, duration: 0 });
   popup = new maplibregl.Popup({ offset: 10, maxWidth: '260px' });
   popup.on('close', () => { openId = null; });
-  map.on('click', 'st', (e) => {
-    openId = e.features[0].properties.id;
-    popup.setLngLat(e.features[0].geometry.coordinates);
-    renderPopup(openId);
-    popup.addTo(map);
-  });
+  map.on('click', 'st', (e) => openStation(e.features[0].properties.id));
   map.on('mouseenter', 'st', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'st', () => { map.getCanvas().style.cursor = ''; });
   refresh();
