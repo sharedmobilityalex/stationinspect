@@ -94,11 +94,11 @@ const map = new maplibregl.Map({
   container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
   center: [-77.09, 38.82], zoom: 12, maxZoom: 19, attributionControl: false,
 });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 // The credits start folded into their (i) button; a tap opens them.
 const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openmaptiles.org/">OpenMapTiles</a> · <a href="https://openfreemap.org">OpenFreeMap</a>';
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: CREDITS }), 'bottom-right');
 document.querySelector('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
 function geojson() {
   return { type: 'FeatureCollection', features: stations.map((s) => ({
@@ -254,7 +254,7 @@ $locate.addEventListener('click', () => {
     const full = window.self !== window.top
       ? ` <a href="${location.href}" target="_blank" rel="noopener">Open the map on its own page</a> to use your location.` : '';
     say(err.code === err.PERMISSION_DENIED
-      ? `Location is blocked here.${full || ' Allow location for this site in your browser settings and try again.'}`
+      ? `Location is blocked here.${full || ' On iPhone: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using the App. Then in Safari tap <b>aA</b> → Website Settings → Location → Allow, and try again.'}`
       : 'Could not get your location. Try again in a moment.');
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
 });
