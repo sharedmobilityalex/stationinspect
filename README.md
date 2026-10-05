@@ -5,7 +5,7 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 - `index.html` is the page. `FIREBASE` near the top of its script holds the project's web settings, which are public by design.
 - `stations.json` is the station list (id, number, name, docks, location).
 - `routes.json` holds travel minutes between every pair of stations, DC (Cleveland Park Metro) and six Alexandria-area Metro stations, for driving and biking (OSRM, OpenStreetMap). Rebuild it when stations change.
-- `firestore.rules` are the database rules. Paste them in the Firebase console under Firestore Database, Rules, and publish. They allow anyone to mark or unmark a station, but not to delete records, add other fields or set the time.
+- `firestore.rules` are the database rules. Paste them in the Firebase console under Firestore Database, Rules, and publish. They allow anyone to mark or unmark a station and to replace the saved plan, but not to delete records, add other fields or set the time.
 
 ## Finding a station
 
@@ -14,17 +14,28 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 
 - Inside an embed, the button at the top right opens the map on its own page, which fills a phone screen. In the embed, move the map with two fingers so one finger still scrolls the form.
 
-## Planning a route
+## Planning
 
-The route button (top right) plans trips through the stations not yet done.
+The route button (top right) opens two tabs.
 
-- Start and End: BCD (Witter Field station), DC (Cleveland Park Metro), your location, or a station or spot tapped on the map. End can be the same as the start.
-- Drive or Bike, and the daily limit: a number of stations or a time, plus minutes spent at each stop. "All left" plans one trip through everything.
-- **Plan all days** splits every station left into compact day trips that each fit the limit (savings-based grouping, then small days folded into others and stations moved between days wherever that shortens the total). Days are coloured and numbered on the map; tap one to make it today's route.
-- **Plan today** builds the same full plan and hands you its fullest day, so today's route never strands scattered stations. Finished stations drop out each time you plan again, so the plan adapts as work gets done.
-- Heading to DC: when driving, each day ends at its last stop and the drive to DC isn't counted. When biking, each day ends with the ride to whichever Metro station is quickest from the last stop (King St–Old Town, Braddock Rd, Eisenhower Ave, Van Dorn St, Potomac Yard or Huntington); the train to DC isn't counted.
-- Times between stations come from `routes.json`. Times to a tapped spot or your location are fetched live; if the routing service doesn't answer within 15 seconds, the plan uses an estimate and says so.
-- Plans are kept on the device until cleared.
+**Project** plans every station left as a set of trips and keeps that plan (in Firebase, `plans/project`) until it is changed, so it is the same in the Tally embed, the full page and on any device.
+
+- Trip kinds, each driven or biked, whichever is quicker for its stations:
+  - Morning: DC → stations → BCD before work, up to 2 h by default. Counts only the time beyond the usual commute.
+  - Afternoon: BCD → stations → home to DC, up to 4 h.
+  - Extended: the same, leaving work early, up to 6 h.
+  - All day: DC → stations → DC, no office, up to 7 h.
+  - Heading home to DC, the drive isn't counted; by bike, the ride to the nearest Metro station is and the train isn't.
+- Settings turn kinds on or off and set their limits, minutes at each stop and getting-started minutes per trip.
+- The planner groups stations into whichever mix of trips takes the least of your time (savings-based grouping, then stations moved between trips and small trips folded in while that lowers the total).
+- "Suggested now" offers a morning trip before 11 and an afternoon kind after. Tap any trip to use it as the route.
+- **Update plan** appears once stations have been finished since the plan was made: it drops them and re-tidies the trips. **Settings / re-plan** starts again from scratch.
+
+**Quick trip** is a one-off route from BCD, DC, your location or any spot or station tapped on the map, for a number of stations or a time. It doesn't change the project plan.
+
+The eye button shows or hides the planned route on the map. Tapping a station always opens its pop-up (name, number, docks, where it sits in the plan, Mark as done) without leaving the route list.
+
+Travel times come from `routes.json`. Times to a tapped spot or your location are fetched live; if routing doesn't answer within 15 seconds, the trip uses an estimate and says so.
 
 ## Data
 

@@ -69,6 +69,22 @@
 
   .me { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
   .end { padding: 2px 6px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  #eyeBtn[aria-pressed="false"] { color: var(--muted); }
+  .maplibregl-popup-content { padding: 12px 14px 10px; border-radius: 10px; min-width: 210px; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .maplibregl-popup-close-button { font-size: 22px; width: 36px; height: 36px; color: var(--muted); }
+  .pop h4 { margin: 0 0 2px; font-size: 15px; padding-right: 26px; }
+  .pop .meta { margin-bottom: 6px; }
+  .pop .big { padding: 10px; font-size: 15px; margin-top: 6px; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; vertical-align: 1px; }
+  .chk { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .chk label { flex: 1; display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .chk input[type=checkbox] { width: 20px; height: 20px; }
+  .chk input[type=number] { width: 70px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
+  .chk small { color: var(--muted); font-weight: 400; }
+  .tabs { display: flex; gap: 6px; margin: 2px 0 10px; }
+  .tabs button { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 600; }
+  .tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .suggest { border: 2px solid var(--blue); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
   #picking { position: absolute; left: 10px; right: 10px; top: 104px; max-width: 360px; z-index: 3; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
   #picking span { flex: 1; }
   #picking button { border: 0; background: none; color: var(--blue); font-weight: 600; cursor: pointer; padding: 8px; }
@@ -90,6 +106,11 @@
     <button id="routeBtn" class="card icon" type="button" title="Plan a route" aria-label="Plan a route">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>
+      </svg>
+    </button>
+    <button id="eyeBtn" class="card icon" type="button" title="Show or hide the planned route" aria-label="Show planned route" aria-pressed="true" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M3 3l18 18" style="display:none"/>
       </svg>
     </button>
     <a id="full" class="card icon" href="./" target="_blank" rel="noopener" title="Open full screen" aria-label="Open the map full screen" hidden>
@@ -131,16 +152,19 @@ const esc = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch {} return null; };
 
 let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
-let view = null;            // what the sheet shows: { kind: 'station', id } | { kind: 'planner' } | { kind: 'route' }
-let away = null, meMarker, plan = store('si-plan'), campaign = store('si-days');
-// Routes saved before the start/end places were renamed.
-for (const r of [plan, campaign]) if (r) for (const p of [r.start, r.end]) p.label = { 'Witter Field': 'BCD', 'Cleveland Park': 'DC' }[p.label] ?? p.label;
+let view = null;            // what the panel shows: { kind: 'project' | 'setup' | 'route' | 'quick' }
+let away = null, meMarker, popId = null;
+let quick = store('si-plan');                 // a quick trip planned on this device
+let active = store('si-active');              // { made, i }: the project trip in use on this device
+let showRoute = store('si-show') ?? true;     // route lines and numbers on the map
+let project = null, projectLocal = store('si-project'), projectRemote = false;
 const live = !!FIREBASE.apiKey;
-let col;
+let col, planDoc;
 if (live) {
   // The local cache keeps taps made with no signal and sends them when the connection returns.
   const db = initializeFirestore(initializeApp(FIREBASE), { localCache: persistentLocalCache() });
   col = collection(db, 'stations');
+  planDoc = doc(db, 'plans', 'project');
 }
 
 // Inside an embed one finger scrolls the form, two move the map; the full page uses one finger.
@@ -156,25 +180,202 @@ document.querySelector('.maplibregl-compact-show .maplibregl-ctrl-attrib-button'
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 if (embedded) $('full').hidden = false;
 
+const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
+const MODE = { drive: 'Drive', bike: 'Bike' };
+
+// ---------- Trip kinds ----------
+// Every project trip is one of these, driven or biked. Morning trips count only the time beyond the usual
+// commute; heading home to DC, the drive isn't counted, and by bike only the ride to the Metro is.
+const KINDS = {
+  morning:   { name: 'Morning',   from: 'DC',  to: 'BCD', hours: 2, color: '#d97706', commuteIn: true,  when: 'before work' },
+  afternoon: { name: 'Afternoon', from: 'BCD', to: 'DC',  hours: 4, color: '#2563eb', commuteOut: true, when: 'after work' },
+  extended:  { name: 'Extended',  from: 'BCD', to: 'DC',  hours: 6, color: '#7c3aed', commuteOut: true, when: 'leave work early' },
+  allday:    { name: 'All day',   from: 'DC',  to: 'DC',  hours: 7, color: '#0d9488', when: 'no office day' },
+};
+const defaultSettings = () => ({ kinds: Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, { on: true, hours: v.hours }])),
+                                 modes: { drive: true, bike: true }, dwell: 10, setup: 10 });
+let settings = store('si-settings') || defaultSettings();
+
+const ix = (id) => routes.ids.indexOf(id);
+// Travel rules for one kind of trip by one mode, over matrix indices.
+function variant(kind, mode) {
+  const k = KINDS[kind], M = routes.min[mode], DC = ix('cp'), B = ix(WITTER);
+  const metros = routes.anchors.filter((a) => a.metro).map((a) => ix(a.id));
+  const n = stations.length;
+  const metroIn = [], metroOut = [];   // quickest Metro station to arrive at / leave from, per station
+  for (let x = 0; x < n; x++) {
+    metroIn[x] = metros.reduce((b, m) => (M[m][x] < M[b][x] ? m : b));
+    metroOut[x] = metros.reduce((b, m) => (M[x][m] < M[x][b] ? m : b));
+  }
+  const first = (x) => k.from === 'DC' ? (mode === 'drive' ? M[DC][x] : M[metroIn[x]][x]) : M[B][x];
+  const last = (x) => k.to === 'DC' ? (mode === 'drive' ? 0 : M[x][metroOut[x]]) : M[x][B];
+  let base = 0;   // what you'd have travelled anyway on a normal commute
+  if (k.commuteIn) base += mode === 'drive' ? M[DC][B] : Math.min(...metros.map((m) => M[m][B]));
+  if (k.commuteOut && mode === 'bike') base += Math.min(...metros.map((m) => M[B][m]));
+  const pt = (i) => { const id = routes.ids[i]; const a = byId[id] || routes.anchors.find((q) => q.id === id); return { id, lat: a.lat, lng: a.lng, name: a.name }; };
+  const start = (r) => k.from === 'DC' ? (mode === 'drive' ? { ...pt(DC), label: 'DC' } : { ...pt(metroIn[r[0]]), label: `${pt(metroIn[r[0]]).name} (Metro from DC)` }) : { ...pt(B), label: 'BCD' };
+  const end = (r) => k.to === 'DC'
+    ? (mode === 'drive' ? { ...pt(r[r.length - 1]), label: 'last stop', after: 'then drive home (not counted)' }
+      : { ...pt(metroOut[r[r.length - 1]]), label: pt(metroOut[r[r.length - 1]]).name, after: 'then Metro home (not counted)' })
+    : { ...pt(B), label: 'BCD' };
+  return { kind, mode, M, first, last, base, start, end, cap: (settings.kinds[kind]?.hours ?? k.hours) * 60 };
+}
+
+// ---------- Project planner ----------
+// Splits stations into trips of whichever kind and mode costs least, each within its kind's time limit.
+// Savings joins build compact trips; stations then move between trips, and small trips are folded into
+// others, whenever that lowers the total counted time. Starting from existing trips just re-tidies them.
+function planProject(cand, initial) {
+  const V = [];
+  for (const k of Object.keys(KINDS)) if (settings.kinds[k]?.on) for (const m of ['drive', 'bike']) if (settings.modes[m]) V.push(variant(k, m));
+  if (!V.length) throw new Error('Turn on at least one kind of trip and one way of getting around.');
+  const dwell = settings.dwell, setup = settings.setup;
+  const travel = (v, r) => { if (!r.length) return 0; let c = v.first(r[0]); for (let i = 1; i < r.length; i++) c += v.M[r[i - 1]][r[i]]; return c + v.last(r[r.length - 1]); };
+  const dur = (v, r) => travel(v, r) + r.length * dwell;
+  const cost = (v, r) => dur(v, r) + setup - v.base;
+  const fits = (v, r) => dur(v, r) <= v.cap;
+  const tidy = (v, r) => { const S = -1, E = -2;
+    const T = (a, b) => a === b ? 0 : a === S ? (b === E ? 0 : v.first(b)) : b === E ? v.last(a) : (a === E || b === S) ? 1e6 : v.M[a][b];
+    return solve(r, T, S, E, {}, dwell); };
+  const best = (r) => { let b = null; for (const v of V) { const o = tidy(v, r); if (!fits(v, o)) continue; const c = cost(v, o); if (!b || c < b.c) b = { v, r: o, c }; } return b; };
+  let trips = [], skipped = [];
+  if (initial) {
+    for (const t of initial) { if (!t.length) continue; const b = best(t); if (b) trips.push(b); else t.forEach((x) => { const s1 = best([x]); if (s1) trips.push(s1); else skipped.push(x); }); }
+  } else {
+    for (const x of cand) { const b = best([x]); if (b) trips.push(b); else skipped.push(x); }
+    const sav = [];
+    for (const v of V) for (const t1 of trips) for (const t2 of trips) {
+      const i = t1.r[0], j = t2.r[0]; if (i === j) continue;
+      const g = v.last(i) + v.first(j) + setup - v.base - v.M[i][j]; if (g > 0) sav.push([g, v, i, j]);
+    }
+    sav.sort((a, b) => b[0] - a[0]);
+    const of = new Map(trips.map((t) => [t.r[0], t]));
+    for (const [, v, i, j] of sav) {
+      const a = of.get(i), b = of.get(j);
+      if (!a || !b || a === b || a.r[a.r.length - 1] !== i || b.r[0] !== j) continue;
+      const r = [...a.r, ...b.r]; if (!fits(v, r)) continue;
+      const c = cost(v, r); if (c >= a.c + b.c) continue;
+      const m = { v, r, c }; trips = trips.filter((t) => t !== a && t !== b); trips.push(m); r.forEach((x) => of.set(x, m));
+    }
+    trips = trips.map((t) => best(t.r) || t);
+  }
+  // Price of putting x into trip t at its cheapest spot, and of taking x out, under the trip's own rules.
+  const ins = (t, x) => { const { v, r } = t; let b = null;
+    for (let k = 0; k <= r.length; k++) {
+      const a = k ? v.M[r[k - 1]][x] : v.first(x), c = k < r.length ? v.M[x][r[k]] : v.last(x);
+      const o = k ? (k < r.length ? v.M[r[k - 1]][r[k]] : v.last(r[k - 1])) : (r.length ? v.first(r[0]) : 0);
+      const d = a + c - o + dwell; if (!b || d < b.d) b = { d, k };
+    } return b; };
+  const rem = (t, x) => { const { v, r } = t, k = r.indexOf(x); if (r.length === 1) return t.c;
+    const a = k ? v.M[r[k - 1]][x] : v.first(x), c = k < r.length - 1 ? v.M[x][r[k + 1]] : v.last(x);
+    const o = k === 0 ? v.first(r[1]) : k === r.length - 1 ? v.last(r[k - 1]) : v.M[r[k - 1]][r[k + 1]];
+    return a + c - o + dwell; };
+  for (let pass = 0, moved = true; moved && pass < 10; pass++) {
+    moved = false;
+    for (const A of trips.slice()) for (const x of A.r.slice()) {
+      if (!trips.includes(A)) break;
+      const gain = rem(A, x); let bb = null;
+      for (const B of trips) { if (B === A) continue; const i = ins(B, x); if (i.d < gain - 1e-6 && (!bb || i.d < bb.i.d)) bb = { B, i }; }
+      if (!bb) continue;
+      const rest = A.r.filter((y) => y !== x), Ar = rest.length ? best(rest) : { c: 0, r: [] };
+      const Bn = best([...bb.B.r.slice(0, bb.i.k), x, ...bb.B.r.slice(bb.i.k)]);
+      if (Ar && Bn && Ar.c + Bn.c < A.c + bb.B.c - 1e-6) { trips = trips.filter((t) => t !== A && t !== bb.B); if (Ar.r.length) trips.push(Ar); trips.push(Bn); moved = true; }
+    }
+  }
+  for (let again = true; again;) {
+    again = false;
+    for (const A of trips.slice().sort((x, y) => x.r.length - y.r.length)) {
+      let others = trips.filter((t) => t !== A).map((t) => ({ ...t })), ok = true;
+      for (const x of A.r) {
+        let bb = null, bi = -1;
+        others.forEach((t, i) => { const q = ins(t, x); const r = [...t.r.slice(0, q.k), x, ...t.r.slice(q.k)]; if (fits(t.v, r) && (!bb || q.d < bb.d)) { bb = { d: q.d, r }; bi = i; } });
+        if (!bb) { ok = false; break; }
+        const nb = best(bb.r); if (!nb) { ok = false; break; } others[bi] = nb;
+      }
+      if (ok && others.reduce((t, o) => t + o.c, 0) < trips.reduce((t, o) => t + o.c, 0) - 1e-6) { trips = others; again = true; break; }
+    }
+  }
+  // Mornings first, then afternoons, extended, all day; within a kind, the cheapest first.
+  const order = Object.keys(KINDS);
+  trips.sort((a, b) => order.indexOf(a.v.kind) - order.indexOf(b.v.kind) || a.c - b.c);
+  return { trips: trips.map((t) => ({ kind: t.v.kind, mode: t.v.mode, stops: t.r.map((i) => routes.ids[i]) })), skipped: skipped.map((i) => routes.ids[i]) };
+}
+
+// Times and end points of a saved trip, worked out from the travel table.
+function expand(t) {
+  const v = variant(t.kind, t.mode), r = t.stops.map(ix).filter((i) => i >= 0);
+  if (!r.length) return null;
+  const legs = [v.first(r[0])]; for (let i = 1; i < r.length; i++) legs.push(v.M[r[i - 1]][r[i]]); legs.push(v.last(r[r.length - 1]));
+  const travel = legs.reduce((a, b) => a + b, 0), total = travel + r.length * settingsOf().dwell;
+  const end = v.end(r);
+  return { ...t, legs, travel, total, base: v.base,
+           start: v.start(r), end, after: end.after || '', dwell: settingsOf().dwell };
+}
+const settingsOf = () => project?.settings || settings;
+
+// ---------- Saving the project ----------
+async function saveProject(p) {
+  project = p;
+  store('si-project', p);
+  projectLocal = p;
+  refresh();
+  if (!live) return;
+  try {
+    await setDoc(planDoc, { v: 1, made: serverTimestamp(), settings: p.settings, trips: p.trips, doneAtMake: p.doneAtMake });
+  } catch (err) {
+    say(`The plan is saved on this device only: the Firebase rules don't allow saving plans yet. <small style="color:var(--muted)">(${esc(err.code || err.message)})</small>`);
+  }
+}
+if (live) {
+  onSnapshot(planDoc, (snap) => {
+    const d = snap.data();
+    if (d && d.trips?.length) {
+      projectRemote = true;
+      project = { settings: d.settings, trips: d.trips, doneAtMake: d.doneAtMake || [], made: d.made?.toMillis?.() || Date.now() };
+      store('si-project', project);
+    } else if (snap.exists() && !d?.trips?.length) { projectRemote = true; project = null; store('si-project', null); }
+    else {
+      project = projectLocal;
+      // A plan made before saving to Firebase was possible goes up now.
+      if (projectLocal?.trips?.length) saveProject(projectLocal);
+    }
+    refresh();
+  }, () => { project = projectLocal; refresh(); });
+} else project = projectLocal;
+
+// ---------- The route shown on the map ----------
+// Either the project trip chosen on this device or a quick trip.
+function currentRoute() {
+  if (active && project?.trips?.[active.i] && routes) {
+    const e = expand(project.trips[active.i]);
+    if (e) return { ...e, title: `${KINDS[e.kind].name} trip ${tripNumber(active.i)}`, fromProject: true };
+  }
+  return quick;
+}
+const tripNumber = (i) => project.trips.slice(0, i + 1).filter((t) => t.kind === project.trips[i].kind).length;
+
 // ---------- Map layers ----------
-// Each dot carries the number to show (stop order, or day in the all-days view), a colour and whether it fades.
-const showingDays = () => view?.kind === 'days' && campaign;
+// The whole plan shows while its list is open, and whenever no single trip is in use.
+const showingProject = () => !!(project?.trips?.length && routes && (view?.kind === 'project' || !currentRoute()));
 function stationData() {
-  const lbl = {}, col = {};
-  if (showingDays()) campaign.days.forEach((d, i) => d.stops.forEach((id) => { lbl[id] = i + 1; col[id] = dayColor(i); }));
-  else if (plan) plan.stops.forEach((id, i) => { lbl[id] = i + 1; });
-  const focused = showingDays() || plan;
+  const lbl = {}, col = {}, plan = currentRoute();
+  if (showRoute && showingProject()) project.trips.forEach((t, i) => t.stops.forEach((id) => { lbl[id] = i + 1; col[id] = KINDS[t.kind].color; }));
+  else if (showRoute && plan) plan.stops.forEach((id, i) => { lbl[id] = i + 1; });
+  const focused = showRoute && (showingProject() || plan);
   return { type: 'FeatureCollection', features: stations.map((s) => ({
     type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
     properties: { id: s.id, name: s.name, done: !!done[s.id], lbl: lbl[s.id] || 0, col: col[s.id] || '',
-                  dim: !!focused && !lbl[s.id], sel: view?.kind === 'station' && view.id === s.id } })) };
+                  dim: !!focused && !lbl[s.id], sel: popId === s.id } })) };
 }
 
 function routeData() {
   const line = (r, color) => ({ type: 'Feature', properties: { col: color },
-    geometry: { type: 'LineString', coordinates: [r.start, ...r.stops.map((id) => byId[id]), r.end].map((p) => [p.lng, p.lat]) } });
-  if (showingDays()) return { type: 'FeatureCollection', features: campaign.days.map((d, i) => line({ ...campaign, stops: d.stops, end: d.end || campaign.end }, dayColor(i))) };
-  return { type: 'FeatureCollection', features: plan ? [line(plan, '#2563eb')] : [] };
+    geometry: { type: 'LineString', coordinates: [r.start, ...r.stops.map((id) => byId[id]), r.end].filter(Boolean).map((p) => [p.lng, p.lat]) } });
+  if (!showRoute) return { type: 'FeatureCollection', features: [] };
+  if (showingProject()) return { type: 'FeatureCollection', features: project.trips.map((t) => expand(t)).filter(Boolean)
+    .map((e) => line({ ...e, start: e.start.id === 'cp' ? null : e.start }, KINDS[e.kind].color)) };
+  const plan = currentRoute();
+  return { type: 'FeatureCollection', features: plan ? [line({ ...plan, start: plan.start.id === 'cp' ? null : plan.start }, '#2563eb')] : [] };
 }
 
 function addLayers() {
@@ -183,12 +384,12 @@ function addLayers() {
     paint: { 'line-color': ['get', 'col'], 'line-width': 3, 'line-opacity': .7, 'line-dasharray': [2, 1.5] } });
   map.addSource('st', { type: 'geojson', data: stationData() });
   // To do = filled red; done = white ring with a thick green edge, so the two differ by shape as well as colour.
-  // With a route planned, stations off the route fade back and route stops grow to carry their number.
+  // With a route shown, stations off it fade back and its stops grow to carry their number.
   const r = ['interpolate', ['linear'], ['zoom'], 11, ['case', ['>', ['get', 'lbl'], 0], 9, 5], 16, ['case', ['>', ['get', 'lbl'], 0], 13, 10]];
   map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
     'circle-radius': r,
     'circle-color': ['case', ['get', 'done'], '#ffffff', ['!=', ['get', 'col'], ''], ['get', 'col'], '#ef4444'],
-    'circle-stroke-color': ['case', ['get', 'sel'], '#2563eb', ['get', 'done'], '#16a34a', '#ffffff'],
+    'circle-stroke-color': ['case', ['get', 'sel'], '#1f2937', ['get', 'done'], '#16a34a', '#ffffff'],
     'circle-stroke-width': ['case', ['get', 'sel'], 4, ['get', 'done'], 3.5, 1.5],
     'circle-opacity': ['case', ['get', 'dim'], .35, 1],
     'circle-stroke-opacity': ['case', ['get', 'dim'], .35, 1] } });
@@ -207,15 +408,22 @@ function refresh() {
     map.getSource('route').setData(routeData());
   }
   drawEnds();
-  $('routeBtn').classList.toggle('on', !!(plan || campaign));
+  const has = !!(currentRoute() || project);
+  $('routeBtn').classList.toggle('on', has);
+  $('eyeBtn').hidden = !has;
+  $('eyeBtn').setAttribute('aria-pressed', String(showRoute));
+  $('eyeBtn').querySelector('.slash').style.display = showRoute ? 'none' : '';
   if (!stations.length) return;
   const n = stations.filter((s) => done[s.id]).length;
   $('count').innerHTML = `${n} / ${stations.length} done <span class="lg"><span class="dot"></span>to do <span class="dot done"></span>done</span>`
     + (live ? '' : ' <span class="lg">(demo, not saved)</span>');
   if (view) render();
+  if (popId) renderPop();
 }
 
-// ---------- Sheet ----------
+$('eyeBtn').onclick = () => { showRoute = !showRoute; store('si-show', showRoute); refresh(); };
+
+// ---------- Panel ----------
 function show(v) { view = v; render(); refresh(); }
 function hideSheet() { view = null; $('sheet').hidden = true; refresh(); }
 $('close').onclick = hideSheet;
@@ -223,38 +431,99 @@ $('close').onclick = hideSheet;
 function render() {
   $('sheet').hidden = false;
   const b = $('body');
-  if (view.kind === 'station') b.innerHTML = stationHTML(view.id);
-  else if (view.kind === 'planner') b.innerHTML = plannerHTML();
-  else if (view.kind === 'route') b.innerHTML = routeHTML();
-  else if (view.kind === 'days') b.innerHTML = daysHTML();
+  b.innerHTML = view.kind === 'project' ? projectHTML() : view.kind === 'setup' ? setupHTML()
+    : view.kind === 'route' ? routeHTML() : quickHTML();
   wire(b);
 }
 
-function nextStop(after) {
-  if (!plan) return null;
-  return plan.stops.find((id) => id !== after && !done[id]) || null;
+const tabs = (on) => `<div class="tabs"><button data-act="project" aria-pressed="${on === 'project'}">Project</button><button data-act="quick" aria-pressed="${on === 'quick'}">Quick trip</button></div>`;
+
+function nextStop(plan, after) { return plan?.stops.find((id) => id !== after && !done[id]) || null; }
+
+// Which saved trip suits right now: mornings before 11, afternoon kinds after.
+function suggested() {
+  if (!project?.trips?.length) return -1;
+  const h = new Date().getHours(), want = h < 11 ? ['morning', 'allday'] : ['afternoon', 'extended', 'allday'];
+  const open = project.trips.map((t, i) => ({ t, i })).filter(({ t }) => t.stops.some((id) => !done[id]));
+  return (open.find(({ t }) => want.includes(t.kind)) || open[0] || { i: -1 }).i;
 }
 
-function stationHTML(id) {
-  const s = byId[id], d = done[id];
-  const when = pending.has(id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
-  const k = plan ? plan.stops.indexOf(id) : -1;
-  const nx = nextStop(id);
-  return `<h3>${esc(s.name)}</h3>
-    <div class="meta">Station ${esc(s.num)} · ${s.docks} docks${k >= 0 ? ` · Stop ${k + 1} of ${plan.stops.length}` : ''}</div>
-    ${away?.id === id ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
-    <button class="big ${d ? 'undo' : ''}" data-act="toggle">${d ? 'Undo' : 'Mark as done'}</button>
-    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">Next stop: ${esc(byId[nx].name)} →</button>` : ''}
-    ${plan && !nx && k >= 0 ? `<div class="note">That's every stop on this route. Head to ${esc(plan.end.label)}.</div>` : ''}
-    ${when ? `<div class="note">${when}</div>` : ''}`;
+function projectHTML() {
+  if (!project?.trips?.length) return `${tabs('project')}<h3>Plan the whole project</h3>
+    <div class="meta">Split every station left into morning, afternoon, extended and all-day trips, and keep that plan until you change it.</div>
+    <button class="big blue" data-act="setup">Set up the plan</button>`;
+  if (!routes) return `${tabs('project')}<div class="note">Loading travel times…</div>`;
+  const E = project.trips.map(expand);
+  const all = project.trips.flatMap((t) => t.stops), left = all.filter((id) => !done[id]).length;
+  const doneSince = all.filter((id) => done[id] && !project.doneAtMake.includes(id)).length;
+  const sg = suggested();
+  const rows = E.map((e, i) => {
+    if (!e) return '';
+    const n = e.stops.filter((id) => done[id]).length, k = KINDS[e.kind];
+    return `<li data-trip="${i}" class="${n === e.stops.length ? 'done' : ''}"><span class="n" style="background:${k.color}">${i + 1}</span>
+      <span class="nm"><span class="badge" style="background:${k.color}">${k.name}</span> ${MODE[e.mode]} · ${e.stops.length} stops · ${fmtMin(e.total)}${n ? ` · ${n} done` : ''}
+      <br><small style="color:var(--muted)">${esc(byId[e.stops[0]].name)} → ${esc(byId[e.stops[e.stops.length - 1]].name)}</small></span>
+      <span class="t">${active?.i === i ? 'in use' : ''}</span></li>`;
+  }).join('');
+  const counted = E.reduce((t, e) => t + (e ? e.total - e.base : 0), 0);
+  return `${tabs('project')}<h3>${project.trips.length} trips · ${left} stations left</h3>
+    <div class="meta">About ${fmtMin(counted)} of your time beyond normal commuting · ${settingsOf().dwell} min per stop${projectRemote ? '' : ' · saved on this device only'}</div>
+    ${doneSince ? `<button class="big blue" data-act="update">Update plan (${doneSince} done since it was made)</button>` : ''}
+    ${sg >= 0 ? `<div class="suggest"><b>Suggested now:</b> ${KINDS[project.trips[sg].kind].name} trip ${tripNumber(sg)} (${KINDS[project.trips[sg].kind].when})
+      <button class="big blue" data-act="usetrip" data-id="${sg}">Use this trip</button></div>` : ''}
+    <ol class="stops">${rows}</ol>
+    <div class="note">Tap a trip to use it. Colours: ${Object.values(KINDS).map((k) => `<span class="badge" style="background:${k.color}">${k.name}</span>`).join(' ')}</div>
+    <div class="row"><button class="big plain" data-act="setup">Settings / re-plan</button></div>`;
 }
 
-// ---------- Route planner ----------
-let form = store('si-form') || { start: 'wf', end: 'same', mode: 'drive', limit: 'all', count: 12, hours: 2, dwell: 10 };
+function setupHTML() {
+  const st = settings;
+  const kindRows = Object.entries(KINDS).map(([k, v]) => `<div class="chk"><label><input type="checkbox" data-kind="${k}" ${st.kinds[k].on ? 'checked' : ''}>
+      ${v.name} <small>${v.from} → ${v.to} · ${v.when}</small></label>
+      <input type="number" data-hours="${k}" min="0.5" max="12" step="0.5" inputmode="decimal" value="${st.kinds[k].hours}" aria-label="${v.name} hours"><small>h max</small></div>`).join('');
+  return `${tabs('project')}<h3>Project plan settings</h3>
+    <div class="meta">Which kinds of trips you're willing to do, and the longest each can be.</div>
+    ${kindRows}
+    <label class="f">Getting around (each trip uses whichever is quicker)</label>
+    <div class="chk"><label><input type="checkbox" data-mode="drive" ${st.modes.drive ? 'checked' : ''}> Drive</label><label><input type="checkbox" data-mode="bike" ${st.modes.bike ? 'checked' : ''}> Bike</label></div>
+    <div class="row">
+      <div><label class="f" for="sDwell">Minutes at each stop</label><input class="f" id="sDwell" data-set="dwell" type="number" min="0" max="60" inputmode="numeric" value="${st.dwell}"></div>
+      <div><label class="f" for="sSetup">Getting-started minutes per trip</label><input class="f" id="sSetup" data-set="setup" type="number" min="0" max="60" inputmode="numeric" value="${st.setup}"></div>
+    </div>
+    <button class="big blue" data-act="planproject">${project?.trips?.length ? 'Re-plan from scratch' : 'Plan the project'}</button>
+    ${project?.trips?.length ? '<button class="big plain" data-act="project">Back to the plan</button>' : ''}
+    <div class="note">Morning trips count only the time beyond your usual commute. Heading home to DC, the drive isn't counted; by bike, the ride to the Metro is and the train isn't. Finished stations are left out.</div>`;
+}
+
+function routeHTML() {
+  const plan = currentRoute();
+  if (!plan) return projectHTML();
+  const left = plan.stops.filter((id) => !done[id]).length;
+  let t = 0;
+  const rows = plan.stops.map((id, i) => {
+    t += plan.legs[i] + (i ? plan.dwell : 0);
+    return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
+  }).join('');
+  const lastLeg = plan.legs[plan.legs.length - 1];
+  const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
+  const nx = nextStop(plan);
+  const head = plan.fromProject ? `${esc(plan.title)} · ${MODE[plan.mode]}` : `Quick trip · ${MODE[plan.mode]}`;
+  return `${tabs(plan.fromProject ? 'project' : 'quick')}<h3>${head} · ${plan.stops.length} stops · ${fmtMin(plan.total)}</h3>
+    <div class="meta">${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}
+      ${plan.fromProject && plan.base ? ` · ${fmtMin(Math.max(0, plan.total - plan.base))} more than your normal commute` : ''}</div>
+    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
+      : '<div class="note">Every stop on this route is done.</div>'}
+    <ol class="stops">${rows}${endRow}</ol>
+    <div class="row">${plan.fromProject ? '<button class="big plain" data-act="project">Whole plan</button><button class="big plain" data-act="stoptrip">Stop using</button>'
+      : '<button class="big plain" data-act="quick">Change</button><button class="big plain" data-act="clear">Clear route</button>'}</div>
+    <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
+}
+
+// ---------- Quick trip (one-off route from any start) ----------
+let form = store('si-form') || { start: 'wf', end: 'same', mode: 'drive', limit: 'time', count: 12, hours: 2, dwell: 10 };
 if (!['drive', 'bike'].includes(form.mode)) form.mode = 'drive';
+if (form.limit === 'all') form.limit = 'time';
 let picked = store('si-picked') || { start: null, end: null };   // points chosen on the map: { kind, id?, lat, lng, label }
-
-const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
 
 function placeOptions(which) {
   const opts = [['wf', 'BCD'], ['cp', 'DC'], ['me', 'My location'], ['pick', 'Choose on map…']];
@@ -264,62 +533,21 @@ function placeOptions(which) {
   return opts.map(([v, t]) => `<option value="${v}"${form[which] === v ? ' selected' : ''}>${esc(t)}</option>`).join('');
 }
 
-function plannerHTML() {
+function quickHTML() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-seg="${k}" data-v="${v}" aria-pressed="${form[k] === v}">${t}</button>`).join('')}</div>`;
-  return `<h3>Plan a route</h3>
-    <div class="meta">Orders the stations still to do for the shortest trip.</div>
+  return `${tabs('quick')}<h3>Quick trip</h3>
+    <div class="meta">A one-off route from anywhere, separate from the project plan.</div>
     <label class="f" for="fStart">Start</label><select class="f" id="fStart" data-f="start">${placeOptions('start')}</select>
     <label class="f" for="fEnd">End</label><select class="f" id="fEnd" data-f="end">${placeOptions('end')}</select>
     <label class="f">Getting around</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike']])}
-    <label class="f">How much today</label>${seg('limit', [['all', 'All left'], ['count', 'Stations'], ['time', 'Time']])}
+    <label class="f">How much</label>${seg('limit', [['count', 'Stations'], ['time', 'Time']])}
     <div class="row">
       ${form.limit === 'count' ? `<div><label class="f" for="fCount">Stations</label><input class="f" id="fCount" data-f="count" type="number" min="1" max="72" inputmode="numeric" value="${form.count}"></div>` : ''}
       ${form.limit === 'time' ? `<div><label class="f" for="fHours">Hours</label><input class="f" id="fHours" data-f="hours" type="number" min="0.5" max="12" step="0.5" inputmode="decimal" value="${form.hours}"></div>` : ''}
       <div><label class="f" for="fDwell">Minutes at each stop</label><input class="f" id="fDwell" data-f="dwell" type="number" min="0" max="60" inputmode="numeric" value="${form.dwell}"></div>
     </div>
-    <div class="row"><button class="big blue" data-act="plan">Plan today</button>${form.limit === 'all' ? ''
-      : '<button class="big plain" data-act="plandays">Plan all days</button>'}</div>
-    <div class="note">${form.limit === 'all' ? 'Set a number of stations or a time to split the work into days.'
-      : 'Both plan every station left, split into days that fit this limit. "Plan today" gives you the fullest of those days, so nothing gets stranded.'}</div>
-    ${plan ? '<button class="big plain" data-act="showroute">Back to current route</button>' : ''}
-    ${campaign ? '<button class="big plain" data-act="days">Back to all days</button>' : ''}`;
-}
-
-function routeHTML() {
-  const left = plan.stops.filter((id) => !done[id]).length;
-  let t = 0;
-  const rows = plan.stops.map((id, i) => {
-    t += plan.legs[i] + (i ? plan.dwell : 0);
-    return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
-  }).join('');
-  const lastLeg = plan.legs[plan.legs.length - 1];
-  const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
-  const nx = nextStop();
-  return `<h3>${plan.day ? `Day ${plan.day} of ${plan.of} · ` : ''}${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
-    <div class="meta">${{ drive: 'Driving', bike: 'Biking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
-      · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
-    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
-      : '<div class="note">Every stop on this route is done.</div>'}
-    <ol class="stops">${rows}${endRow}</ol>
-    <div class="row"><button class="big plain" data-act="planner">Change</button>${campaign ? '<button class="big plain" data-act="days">All days</button>' : ''}<button class="big plain" data-act="clear">Clear route</button></div>
-    <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
-}
-
-function daysHTML() {
-  const c = campaign, all = c.days.flatMap((d) => d.stops), left = all.filter((id) => !done[id]).length;
-  const rows = c.days.map((d, i) => {
-    const n = d.stops.filter((id) => done[id]).length;
-    return `<li data-day="${i}"><span class="n" style="background:${dayColor(i)}">${i + 1}</span>
-      <span class="nm">${d.stops.length} stops · ${fmtMin(d.total)}${n ? ` · ${n} done` : ''}<br><small style="color:var(--muted)">${esc(byId[d.stops[0]].name)} → ${esc(byId[d.stops[d.stops.length - 1]].name)}</small></span>
-      <span class="t">${i === 0 ? 'fullest' : ''}</span></li>`;
-  }).join('');
-  return `<h3>${c.days.length} days · about ${fmtMin(c.days.reduce((t, d) => t + d.total, 0))} in all</h3>
-    <div class="meta">${{ drive: 'Driving', bike: 'Biking' }[c.mode]} · ${c.limitText} a day · ${c.dwell} min per stop · ${esc(c.start.label)} → ${esc(c.end.label)}</div>
-    ${c.toDC ? `<div class="note">${c.mode === 'bike' ? 'Each day ends with the ride to the nearest Metro station; the train to DC isn\'t counted.' : 'Each day ends at its last stop; the drive to DC isn\'t counted.'}</div>` : ''}
-    ${c.skipped ? `<div class="note">${c.skipped} station${c.skipped > 1 ? 's are' : ' is'} too far to fit in one day at this limit and ${c.skipped > 1 ? 'are' : 'is'} left out.</div>` : ''}
-    <ol class="stops">${rows}</ol>
-    <div class="note">Tap a day to make it today's route. ${left < all.length ? 'Some stations are done since this plan was made; plan again to fold the rest into fewer days.' : 'Finished stations drop out each time you plan again.'}</div>
-    <div class="row"><button class="big plain" data-act="planner">Change</button><button class="big plain" data-act="cleardays">Clear plan</button></div>`;
+    <button class="big blue" data-act="plan">Plan quick trip</button>
+    <div class="note">Picks a compact group that fits, from a split of every station left, so it doesn't strand scattered stations.</div>`;
 }
 
 function wire(b) {
@@ -331,32 +559,59 @@ function wire(b) {
     form[k] = el.tagName === 'INPUT' ? Number(el.value) : el.value;
     store('si-form', form);
   });
+  const saveSettings = () => store('si-settings', settings);
+  b.querySelectorAll('[data-kind]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.kind].on = el.checked; saveSettings(); });
+  b.querySelectorAll('[data-hours]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.hours].hours = Math.max(0.5, Number(el.value) || 1); saveSettings(); });
+  b.querySelectorAll('[data-mode]').forEach((el) => el.onchange = () => { settings.modes[el.dataset.mode] = el.checked; saveSettings(); });
+  b.querySelectorAll('[data-set]').forEach((el) => el.onchange = () => { settings[el.dataset.set] = Math.max(0, Number(el.value) || 0); saveSettings(); });
   b.querySelectorAll('ol.stops li[data-id]').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
-  b.querySelectorAll('ol.stops li[data-day]').forEach((el) => el.onclick = () => loadDay(Number(el.dataset.day)));
+  b.querySelectorAll('ol.stops li[data-trip]').forEach((el) => el.onclick = () => useTrip(Number(el.dataset.trip)));
 }
 
 function act(a, id) {
-  if (a === 'toggle') toggle(byId[view.id]);
-  else if (a === 'go') openStation(id, true);
-  else if (a === 'planner') show({ kind: 'planner' });
-  else if (a === 'showroute') show({ kind: 'route' });
-  else if (a === 'clear') { plan = null; store('si-plan', null); hideSheet(); }
-  else if (a === 'plan') makePlan('today');
-  else if (a === 'plandays') makePlan('days');
-  else if (a === 'days') { show({ kind: 'days' }); fitAll(campaign.days.flatMap((d) => d.stops), campaign); }
-  else if (a === 'cleardays') { campaign = null; store('si-days', null); show({ kind: plan ? 'route' : 'planner' }); }
+  if (a === 'go') openStation(id, true);
+  else if (a === 'project') { show({ kind: 'project' }); fitProject(); }
+  else if (a === 'setup') { if (project?.settings) settings = structuredClone(project.settings); show({ kind: 'setup' }); }
+  else if (a === 'quick') show({ kind: 'quick' });
+  else if (a === 'clear') { quick = null; store('si-plan', null); show({ kind: 'quick' }); }
+  else if (a === 'plan') makeQuick();
+  else if (a === 'planproject') runProject(false);
+  else if (a === 'update') runProject(true);
+  else if (a === 'usetrip') useTrip(Number(id));
+  else if (a === 'stoptrip') { active = null; store('si-active', null); show({ kind: 'project' }); fitProject(); }
 }
 
-$('routeBtn').onclick = () => show({ kind: plan ? 'route' : campaign ? 'days' : 'planner' });
+$('routeBtn').onclick = () => show({ kind: currentRoute() ? 'route' : 'project' });
 
-function loadDay(i) {
-  const d = campaign.days[i];
-  plan = { ...d, mode: campaign.mode, dwell: campaign.dwell, start: campaign.start, end: d.end || campaign.end, after: campaign.after,
-           estimated: campaign.estimated,
-           day: i + 1, of: campaign.days.length, made: Date.now() };
-  store('si-plan', plan);
+function useTrip(i) {
+  active = { i }; store('si-active', active);
+  quick = null; store('si-plan', null);
   show({ kind: 'route' });
   fitPlan();
+}
+
+async function runProject(update) {
+  const btn = $('body').querySelector(`[data-act="${update ? 'update' : 'planproject'}"]`);
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Planning…';
+  await new Promise((r) => setTimeout(r, 30));   // let the button repaint before the work starts
+  try {
+    await routesLoaded;
+    if (update) settings = structuredClone(project.settings);
+    const cand = stations.filter((s) => !done[s.id]).map((s) => ix(s.id));
+    if (!cand.length) throw new Error('Every station is already done.');
+    const initial = update ? project.trips.map((t) => t.stops.filter((id) => !done[id]).map(ix)) : null;
+    const res = planProject(cand, initial);
+    if (!res.trips.length) throw new Error('No trip fits these limits. Allow longer trips.');
+    if (res.skipped.length) say(`${res.skipped.length} station${res.skipped.length > 1 ? 's don\'t' : ' doesn\'t'} fit in any allowed trip and ${res.skipped.length > 1 ? 'are' : 'is'} left out. Allow longer trips to include ${res.skipped.length > 1 ? 'them' : 'it'}.`);
+    active = null; store('si-active', null);
+    await saveProject({ settings: structuredClone(settings), trips: res.trips, doneAtMake: stations.filter((s) => done[s.id]).map((s) => s.id), made: Date.now() });
+    show({ kind: 'project' });
+    fitProject();
+  } catch (err) {
+    btn.disabled = false; btn.textContent = label;
+    say(esc(err.message));
+  }
 }
 
 // Choosing a start or end on the map: tap a station dot or any spot.
@@ -375,7 +630,7 @@ function finishPicking(p) {
   store('si-form', form);
   picking = null;
   $('picking').hidden = true;
-  show({ kind: 'planner' });
+  show({ kind: 'quick' });
 }
 
 // ---------- Travel times ----------
@@ -534,8 +789,8 @@ function planDays(cand, T, s, e, limit, dwell) {
   return days.filter((d) => d.length).sort((x, y) => near(x) - near(y));
 }
 
-async function makePlan(kind) {
-  const btn = $('body').querySelector(`[data-act="${kind === 'days' ? 'plandays' : 'plan'}"]`);
+async function makeQuick() {
+  const btn = $('body').querySelector('[data-act="plan"]');
   const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = form.mode !== 'drive' && [form.start, form.end].some((v) => v === 'me' || (v === 'picked' && picked.start?.kind === 'spot') || (v === 'picked' && picked.end?.kind === 'spot'))
@@ -546,7 +801,6 @@ async function makePlan(kind) {
     const [ps, pe] = await Promise.all([place('start'), place('end')]);
     const [ls, le] = await Promise.all([linkPoint(ps, mode), linkPoint(pe, mode)]);
     const M = routes.min[mode], n = routes.ids.length, S = n, E = n + 1;
-    // Nodes: matrix indices 0..n-1, then S and E for the start and end points.
     const T = (a, b) => {
       if (a === b) return 0;
       if (a === S && b === E) return ls.to[routes.ids.indexOf(pe.id)] ?? meters(ps, pe) * pace(mode);
@@ -555,58 +809,53 @@ async function makePlan(kind) {
       if (a === E || b === S) return 1e6;
       return M[a][b];
     };
-    // Heading to DC: driving, the day ends at the last stop (the drive home isn't counted); biking, it ends with
+    // Heading to DC: driving, the trip ends at the last stop (the drive home isn't counted); biking, it ends with
     // the ride to whichever Metro station is quickest from the last stop (the train to DC isn't counted).
-    const toDC = pe.id === 'cp' && (mode === 'drive' || mode === 'bike');
+    const toDC = pe.id === 'cp';
     const metros = routes.anchors.filter((a) => a.metro).map((a) => ({ a, i: routes.ids.indexOf(a.id) }));
     const metroFor = (x) => metros.reduce((b, m) => (M[x][m.i] < M[x][b.i] ? m : b));
     const Td = !toDC ? T : (a, b) => b !== E ? T(a, b) : a === S || mode === 'drive' ? 0 : M[a][metroFor(a).i];
     const cand = stations.filter((st) => !done[st.id]).map((st) => routes.ids.indexOf(st.id));
-    const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : form.limit === 'time' ? { minutes: form.hours * 60 } : {};
+    const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : { minutes: form.hours * 60 };
     if (!cand.length) throw new Error('Every station is already done.');
     const days = planDays(cand, Td, S, E, limit, dwell);
     if (!days.length) throw new Error('Not enough time for even one stop. Try more time.');
-    const sum = (order) => {
-      const path = [S, ...order, E], legs = [];
-      for (let i = 1; i < path.length; i++) legs.push(Td(path[i - 1], path[i]));
-      const travel = legs.reduce((a, b) => a + b, 0);
-      const day = { stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell };
-      const last = order[order.length - 1];
-      if (toDC && mode === 'bike') { const m = metroFor(last).a; day.end = { kind: 'anchor', id: m.id, lat: m.lat, lng: m.lng, label: m.name }; }
-      if (toDC && mode === 'drive') { const st = byId[routes.ids[last]]; day.end = { kind: 'station', id: st.id, lat: st.lat, lng: st.lng, label: 'last stop' }; }
-      return day;
-    };
-    // The fullest day goes first: it is what "Plan today" hands you. The rest stay nearest-first.
-    const full = days.reduce((bi, d, i) => (d.length > days[bi].length ? i : bi), 0);
-    const ordered = [days[full], ...days.filter((_, i) => i !== full)];
-    campaign = { mode, dwell, start: ps, end: pe, estimated: ls.estimated || le.estimated, made: Date.now(), toDC,
-                 after: toDC ? (mode === 'bike' ? 'then Metro to DC (not counted)' : 'then drive to DC (not counted)') : '',
-                 limitText: limit.count ? `${limit.count} stations` : limit.minutes ? fmtMin(limit.minutes) : 'everything',
-                 skipped: cand.length - days.flat().length, days: ordered.map(sum) };
-    store('si-days', campaign);
-    if (kind === 'days') { show({ kind: 'days' }); fitAll(campaign.days.flatMap((d) => d.stops), campaign); }
-    else loadDay(0);
+    // The fullest group is the one handed over, so the rest stay compact for later.
+    const order = days.reduce((b, d) => (d.length > b.length ? d : b), days[0]);
+    const path = [S, ...order, E], legs = [];
+    for (let i = 1; i < path.length; i++) legs.push(Td(path[i - 1], path[i]));
+    const travel = legs.reduce((a, b) => a + b, 0), last = order[order.length - 1];
+    let end = pe, after = '';
+    if (toDC && mode === 'bike') { const m = metroFor(last).a; end = { kind: 'anchor', id: m.id, lat: m.lat, lng: m.lng, label: m.name }; after = 'then Metro to DC (not counted)'; }
+    if (toDC && mode === 'drive') { const st = byId[routes.ids[last]]; end = { kind: 'station', id: st.id, lat: st.lat, lng: st.lng, label: 'last stop' }; after = 'then drive to DC (not counted)'; }
+    quick = { mode, dwell, start: ps, end, after, stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell,
+              estimated: ls.estimated || le.estimated, made: Date.now() };
+    store('si-plan', quick);
+    active = null; store('si-active', null);
+    show({ kind: 'route' });
+    fitPlan();
   } catch (err) {
     btn.disabled = false; btn.textContent = label;
     say(esc(err.message === 'location' ? 'Could not get your location for the route. Pick a place on the map instead.' : err.message));
   }
 }
 
-function fitAll(ids, ends) {
+function fitAll(pts) {
   const b = new maplibregl.LngLatBounds();
-  [ends.start, ends.toDC ? null : ends.end, ...ids.map((id) => byId[id])].filter(Boolean).forEach((p) => b.extend([p.lng, p.lat]));
-  map.fitBounds(b, { padding: padding(), maxZoom: 16 });
+  pts.filter(Boolean).forEach((p) => b.extend([p.lng, p.lat]));
+  if (!b.isEmpty()) map.fitBounds(b, { padding: padding(), maxZoom: 16 });
 }
-const fitPlan = () => fitAll(plan.stops, plan);
+const fitPlan = () => { const p = currentRoute(); if (p) fitAll([p.start.id === 'cp' ? null : p.start, p.end.id === 'cp' ? null : p.end, ...p.stops.map((id) => byId[id])]); };
+const fitProject = () => { if (project?.trips) fitAll(project.trips.flatMap((t) => t.stops).map((id) => byId[id])); };
 
-// Start/end flags.
+// Start/end flags for the route in use (DC itself is off the map's area, so it gets no flag).
 const ends = {};
 function drawEnds() {
+  const plan = showRoute && !showingProject() ? currentRoute() : null;
   for (const k of ['start', 'end']) {
-    const src = showingDays() ? campaign : plan;
-    const p = k === 'end' && showingDays() && campaign.toDC ? null : src?.[k];
-    if (!p) { ends[k]?.remove(); continue; }
-    const same = src.start.lat === src.end.lat && src.start.lng === src.end.lng;
+    const p = plan?.[k];
+    if (!p || p.id === 'cp') { ends[k]?.remove(); continue; }
+    const same = plan.start.lat === plan.end.lat && plan.start.lng === plan.end.lng;
     if (k === 'end' && same) { ends[k]?.remove(); continue; }
     ends[k] ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'end' }), anchor: 'bottom', offset: [0, -12] });
     ends[k].getElement().textContent = same ? 'Start · End' : k === 'start' ? 'Start' : 'End';
@@ -639,8 +888,8 @@ if (live) {
   }, () => { $('count').textContent = 'Could not load the done list'; });
 }
 
-// ---------- Opening stations ----------
-// Keeps the station clear of the top bar and the bottom sheet.
+// ---------- Station pop-up ----------
+// Keeps a point clear of the top bar and the bottom panel.
 function padding() {
   const sheet = $('sheet').hidden ? 0 : $('sheet').offsetHeight;
   const wide = innerWidth >= 640;
@@ -650,16 +899,40 @@ function padding() {
 // Centres a point in the clear part of the map. An offset, unlike padding, doesn't stay on the map afterwards.
 function focus(s, zoom) {
   const pad = padding();
-  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2] });
+  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2 + 60] });
+}
+
+const popup = new maplibregl.Popup({ closeOnClick: false, offset: 14, maxWidth: '280px', focusAfterOpen: false });
+popup.on('close', () => { if (popId) { popId = null; refresh(); } });
+
+function renderPop() {
+  const s = byId[popId]; if (!s) return;
+  const d = done[s.id], plan = currentRoute(), k = plan ? plan.stops.indexOf(s.id) : -1;
+  let where = '';
+  if (k >= 0) where = `Stop ${k + 1} of ${plan.stops.length} on ${plan.fromProject ? `this ${KINDS[plan.kind].name.toLowerCase()} trip` : 'this quick trip'}`;
+  else if (project?.trips) { const i = project.trips.findIndex((t) => t.stops.includes(s.id)); if (i >= 0) where = `In ${KINDS[project.trips[i].kind].name.toLowerCase()} trip ${tripNumber(i)} of the plan`; }
+  const when = pending.has(s.id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.innerHTML = `<h4>${esc(s.name)}</h4><div class="meta">Station ${esc(s.num)} · ${s.docks} docks</div>
+    ${where ? `<div class="note" style="margin:0 0 4px">${where}</div>` : ''}
+    ${away?.id === s.id ? `<div class="away" style="margin-bottom:4px">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
+    <button class="big ${d ? 'undo' : ''}">${d ? 'Undo' : 'Mark as done'}</button>${when ? `<div class="note">${when}</div>` : ''}`;
+  el.querySelector('button').onclick = () => toggle(s);
+  popup.setDOMContent(el);
 }
 
 function openStation(id, fly) {
-  show({ kind: 'station', id });
+  popId = id;
   const s = byId[id];
+  renderPop();
+  popup.setLngLat([s.lng, s.lat]).addTo(map);
+  refresh();
   if (fly) return focus(s, Math.max(map.getZoom(), 15.5));
   const pt = map.project([s.lng, s.lat]), pad = padding();
-  if (pt.y > innerHeight - pad.bottom || pt.x < pad.left) focus(s);
+  if (pt.y > innerHeight - pad.bottom || pt.y < pad.top + 150 || pt.x < pad.left) focus(s);
 }
+function closePop() { if (popId) popup.remove(); }
 
 // Taps count when they land near a dot, not only on it; the closest dot wins.
 map.on('click', (e) => {
@@ -676,7 +949,7 @@ map.on('click', (e) => {
     return finishPicking({ kind: 'spot', lat: e.lngLat.lat, lng: e.lngLat.lng, label: 'Spot on the map' });
   }
   if (best) openStation(best.id);
-  else if (view?.kind === 'station') hideSheet();
+  else closePop();
 });
 map.on('mousemove', (e) => {
   if (!map.getLayer('st')) return;
@@ -771,8 +1044,8 @@ $('locate').addEventListener('click', async () => {
     for (const s of stations) { const m = meters(me, s); if (!best || m < best.m) best = { id: s.id, m }; }
     away = best;
     const s = byId[best.id];
-    openStation(best.id);
     map.fitBounds(new maplibregl.LngLatBounds([me.lng, me.lat], [me.lng, me.lat]).extend([s.lng, s.lat]), { padding: padding(), maxZoom: 17 });
+    openStation(best.id);
   } catch {} finally { $('locate').disabled = false; }
 });
 
@@ -781,12 +1054,12 @@ $('locate').addEventListener('click', async () => {
 const stationsLoaded = fetch('stations.json').then((r) => r.json()).then((list) => {
   stations = list;
   byId = Object.fromEntries(list.map((s) => [s.id, s]));
-  if (plan && !plan.stops.every((id) => byId[id])) { plan = null; store('si-plan', null); }
-  if (campaign && !campaign.days.every((d) => d.stops.every((id) => byId[id]))) { campaign = null; store('si-days', null); }
+  if (quick && !quick.stops.every((id) => byId[id])) { quick = null; store('si-plan', null); }
   refresh();
   if ($q.value) search();
   return list;
 });
+routesLoaded.then(() => refresh());
 map.on('load', async () => {
   await stationsLoaded;
   addLayers();

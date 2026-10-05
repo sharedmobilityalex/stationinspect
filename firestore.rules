@@ -12,5 +12,16 @@ service cloud.firestore {
         && request.resource.data.updated == request.time
         && id.size() < 64;
     }
+    // The saved project plan: a single document, plans/project. Anyone may read and replace it;
+    // nobody may delete it or add other fields, and its time is always the server's.
+    match /plans/{id} {
+      allow read: if true;
+      allow create, update: if id == 'project'
+        && request.resource.data.keys().hasOnly(['v', 'made', 'settings', 'trips', 'doneAtMake'])
+        && request.resource.data.trips is list && request.resource.data.trips.size() <= 100
+        && request.resource.data.doneAtMake is list && request.resource.data.doneAtMake.size() <= 200
+        && request.resource.data.settings is map
+        && request.resource.data.made == request.time;
+    }
   }
 }
