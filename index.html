@@ -18,46 +18,42 @@
   .pop button { width: 100%; padding: 8px; border: 0; border-radius: 6px; font: inherit; font-weight: 600; cursor: pointer;
                 background: var(--done); color: #fff; }
   .pop button.undo { background: #e5e7eb; color: var(--ink); }
-  .pop button:disabled { opacity: .6; cursor: wait; }
-  .pop .when { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .pop .when { color: var(--muted); font-size: 12px; margin-top: 6px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="count">Loading…</div>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script>
-// Web app URL of the deployed Apps Script (sheet.gs). Empty = demo mode, saves nothing.
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzKnNG2AitUp_1Hth9zl34qkp-kizc75dh5DPgI4byqwUfz6XC65CCzmW3SzzeWNFS3uQ/exec';
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
+import { initializeFirestore, persistentLocalCache, collection, doc, setDoc, onSnapshot, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-let stations = [], done = {}, popup, openId = null;
-const saving = new Set();
+// Firebase project settings (Project settings > General > Your apps). These are public by design;
+// what may be written is controlled by firestore.rules. Empty apiKey = demo mode, saves nothing.
+const FIREBASE = {
+  apiKey: 'AIzaSyCNisxF0kUfIKDBT3qWl55EeSB4VUqKYNQ',
+  authDomain: 'stationinspect-3d591.firebaseapp.com',
+  projectId: 'stationinspect-3d591',
+  appId: '1:384507805166:web:03350af9d39be4577fe2ff',
+};
+
+let stations = [], done = {}, pending = new Set(), popup, openId = null;
 const $count = document.getElementById('count');
+const live = !!FIREBASE.apiKey;
+let col;
+if (live) {
+  // The local cache keeps taps made with no signal and sends them when the connection returns.
+  const db = initializeFirestore(initializeApp(FIREBASE), { localCache: persistentLocalCache() });
+  col = collection(db, 'stations');
+}
 
 const map = new maplibregl.Map({
   container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
-  center: [-77.09, 38.82], zoom: 12, maxZoom: 19, cooperativeGestures: false,
+  center: [-77.09, 38.82], zoom: 12, maxZoom: 19,
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-
-// Apps Script is slow at random and sometimes answers with an error page, so calls get a full minute.
-async function call(opts) {
-  const text = await fetch(SHEET_URL, { ...opts, signal: AbortSignal.timeout(60000) }).then((r) => r.text());
-  const result = JSON.parse(text);
-  if (result.error) throw new Error(result.error);
-  return result;
-}
-
-// Returns the Sheet's done list, or null when it can't be read. Stations mid-save keep their local state.
-async function loadDone() {
-  if (!SHEET_URL) return null;
-  try {
-    const fresh = await call();
-    for (const id of saving) { if (done[id]) fresh[id] = done[id]; else delete fresh[id]; }
-    done = fresh;
-    return fresh;
-  } catch { return null; }
-}
 
 function geojson() {
   return { type: 'FeatureCollection', features: stations.map((s) => ({
@@ -67,56 +63,55 @@ function geojson() {
 
 function refresh() {
   map.getSource('st')?.setData(geojson());
+  if (!stations.length) return;
   const n = stations.filter((s) => done[s.id]).length;
-  $count.innerHTML = `${n} / ${stations.length} done` + (SHEET_URL ? '' : ' <span class="note">(demo — not saved)</span>');
+  $count.innerHTML = `${n} / ${stations.length} done` + (live ? '' : ' <span class="note">(demo, not saved)</span>');
   if (openId) renderPopup(openId);
 }
 
 const esc = (t) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function renderPopup(id) {
-  const busy = saving.has(id);
   const s = stations.find((x) => x.id === id);
   const d = done[id];
-  const when = d ? `<div class="when">Done ${new Date(d).toLocaleString()}</div>` : '';
+  const when = pending.has(id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
   const el = document.createElement('div');
   el.className = 'pop';
   el.innerHTML = `<h3>${esc(s.name)}</h3>
     <div class="meta">Station ${s.num} · ${s.docks} docks</div>
-    <button class="${d ? 'undo' : ''}" ${busy ? 'disabled' : ''}>${busy ? 'Saving…' : d ? 'Undo' : 'Mark as done'}</button>${when}`;
+    <button class="${d ? 'undo' : ''}">${d ? 'Undo' : 'Mark as done'}</button>
+    ${when ? `<div class="when">${when}</div>` : ''}`;
   el.querySelector('button').onclick = () => toggle(s);
   popup.setDOMContent(el);
 }
 
-async function toggle(s) {
+function toggle(s) {
   const next = !done[s.id];
-  const prev = done[s.id];
-  if (next) done[s.id] = new Date().toISOString(); else delete done[s.id];
-  saving.add(s.id);
-  refresh();
-  let ok = !SHEET_URL;
-  if (SHEET_URL) {
-    try {
-      // text/plain body avoids a CORS preflight, which Apps Script can't answer.
-      await call({ method: 'POST', body: JSON.stringify({ id: s.id, num: s.num, name: s.name, done: next }) });
-      ok = true;
-    } catch {
-      // The save may have landed even though the answer didn't; check before giving up.
-      saving.delete(s.id);
-      const fresh = await loadDone();
-      ok = !!fresh && !!fresh[s.id] === next;
-    }
+  if (!live) {
+    if (next) done[s.id] = new Date(); else delete done[s.id];
+    return refresh();
   }
-  saving.delete(s.id);
-  if (!ok) {
-    if (prev) done[s.id] = prev; else delete done[s.id];
-    alert('Could not save. Check your connection and try again.');
-  }
-  refresh();
+  // The listener below shows the change at once; the write itself finishes in the background.
+  setDoc(doc(col, s.id), { done: next, num: s.num, name: s.name, updated: serverTimestamp() })
+    .catch(() => alert('Could not save that change. Try again.'));
 }
 
+if (live) {
+  onSnapshot(col, { includeMetadataChanges: true }, (snap) => {
+    done = {};
+    pending = new Set();
+    snap.forEach((d) => {
+      const v = d.data({ serverTimestamps: 'estimate' });
+      if (v.done) done[d.id] = v.updated?.toDate?.() ?? true;
+      if (d.metadata.hasPendingWrites) pending.add(d.id);
+    });
+    refresh();
+  }, () => { $count.textContent = 'Could not load the done list'; });
+}
+
+const stationsLoaded = fetch('stations.json').then((r) => r.json());
 map.on('load', async () => {
-  [stations] = await Promise.all([fetch('stations.json').then((r) => r.json()), loadDone()]);
+  stations = await stationsLoaded;
   map.addSource('st', { type: 'geojson', data: geojson() });
   map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
     'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10],
@@ -136,8 +131,6 @@ map.on('load', async () => {
   map.on('mouseenter', 'st', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'st', () => { map.getCanvas().style.cursor = ''; });
   refresh();
-  // Pick up other people's check-offs.
-  setInterval(async () => { await loadDone(); refresh(); }, 60000);
 });
 </script>
 </body>

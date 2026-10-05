@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // One document per station: { done, num, name, updated }. Anyone may read and mark;
+    // nobody may delete, add other fields, or backdate the time.
+    match /stations/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['done', 'num', 'name', 'updated'])
+        && request.resource.data.done is bool
+        && request.resource.data.num is string && request.resource.data.num.size() < 20
+        && request.resource.data.name is string && request.resource.data.name.size() < 120
+        && request.resource.data.updated == request.time
+        && id.size() < 64;
+    }
+  }
+}
