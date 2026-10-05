@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Station Inspection</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<style>
+  :root { --todo: #ef4444; --done: #16a34a; --ink: #1f2937; --muted: #6b7280; --bg: #fff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); font: 14px/1.4 system-ui, -apple-system, sans-serif; color: var(--ink); }
+  #map { position: absolute; inset: 0; }
+  #count { position: absolute; top: 10px; left: 10px; z-index: 1; background: var(--bg); padding: 6px 10px; border-radius: 6px;
+           box-shadow: 0 1px 4px rgba(0,0,0,.2); font-weight: 600; }
+  #count .note { font-weight: 400; color: var(--muted); }
+  .maplibregl-popup-content { padding: 12px 14px; min-width: 180px; }
+  .pop h3 { margin: 0 0 2px; font-size: 15px; }
+  .pop .meta { color: var(--muted); margin-bottom: 8px; }
+  .pop button { width: 100%; padding: 8px; border: 0; border-radius: 6px; font: inherit; font-weight: 600; cursor: pointer;
+                background: var(--done); color: #fff; }
+  .pop button.undo { background: #e5e7eb; color: var(--ink); }
+  .pop button:disabled { opacity: .6; cursor: wait; }
+  .pop .when { color: var(--muted); font-size: 12px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="count">Loading…</div>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script>
+// Web app URL of the deployed Apps Script (sheet.gs). Empty = demo mode, saves nothing.
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzKnNG2AitUp_1Hth9zl34qkp-kizc75dh5DPgI4byqwUfz6XC65CCzmW3SzzeWNFS3uQ/exec';
+
+let stations = [], done = {}, popup, openId = null;
+const saving = new Set();
+const $count = document.getElementById('count');
+
+const map = new maplibregl.Map({
+  container: 'map', style: 'https://tiles.openfreemap.org/styles/positron',
+  center: [-77.09, 38.82], zoom: 12, maxZoom: 19, cooperativeGestures: false,
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+// Apps Script is slow at random and sometimes answers with an error page, so calls get a full minute.
+async function call(opts) {
+  const text = await fetch(SHEET_URL, { ...opts, signal: AbortSignal.timeout(60000) }).then((r) => r.text());
+  const result = JSON.parse(text);
+  if (result.error) throw new Error(result.error);
+  return result;
+}
+
+// Returns the Sheet's done list, or null when it can't be read. Stations mid-save keep their local state.
+async function loadDone() {
+  if (!SHEET_URL) return null;
+  try {
+    const fresh = await call();
+    for (const id of saving) { if (done[id]) fresh[id] = done[id]; else delete fresh[id]; }
+    done = fresh;
+    return fresh;
+  } catch { return null; }
+}
+
+function geojson() {
+  return { type: 'FeatureCollection', features: stations.map((s) => ({
+    type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
+    properties: { id: s.id, done: !!done[s.id] } })) };
+}
+
+function refresh() {
+  map.getSource('st')?.setData(geojson());
+  const n = stations.filter((s) => done[s.id]).length;
+  $count.innerHTML = `${n} / ${stations.length} done` + (SHEET_URL ? '' : ' <span class="note">(demo — not saved)</span>');
+  if (openId) renderPopup(openId);
+}
+
+const esc = (t) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function renderPopup(id) {
+  const busy = saving.has(id);
+  const s = stations.find((x) => x.id === id);
+  const d = done[id];
+  const when = d ? `<div class="when">Done ${new Date(d).toLocaleString()}</div>` : '';
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.innerHTML = `<h3>${esc(s.name)}</h3>
+    <div class="meta">Station ${s.num} · ${s.docks} docks</div>
+    <button class="${d ? 'undo' : ''}" ${busy ? 'disabled' : ''}>${busy ? 'Saving…' : d ? 'Undo' : 'Mark as done'}</button>${when}`;
+  el.querySelector('button').onclick = () => toggle(s);
+  popup.setDOMContent(el);
+}
+
+async function toggle(s) {
+  const next = !done[s.id];
+  const prev = done[s.id];
+  if (next) done[s.id] = new Date().toISOString(); else delete done[s.id];
+  saving.add(s.id);
+  refresh();
+  let ok = !SHEET_URL;
+  if (SHEET_URL) {
+    try {
+      // text/plain body avoids a CORS preflight, which Apps Script can't answer.
+      await call({ method: 'POST', body: JSON.stringify({ id: s.id, num: s.num, name: s.name, done: next }) });
+      ok = true;
+    } catch {
+      // The save may have landed even though the answer didn't; check before giving up.
+      saving.delete(s.id);
+      const fresh = await loadDone();
+      ok = !!fresh && !!fresh[s.id] === next;
+    }
+  }
+  saving.delete(s.id);
+  if (!ok) {
+    if (prev) done[s.id] = prev; else delete done[s.id];
+    alert('Could not save. Check your connection and try again.');
+  }
+  refresh();
+}
+
+map.on('load', async () => {
+  [stations] = await Promise.all([fetch('stations.json').then((r) => r.json()), loadDone()]);
+  map.addSource('st', { type: 'geojson', data: geojson() });
+  map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10],
+    'circle-color': ['case', ['get', 'done'], '#16a34a', '#ef4444'],
+    'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+  const b = new maplibregl.LngLatBounds();
+  stations.forEach((s) => b.extend([s.lng, s.lat]));
+  map.fitBounds(b, { padding: 40, duration: 0 });
+  popup = new maplibregl.Popup({ offset: 10, maxWidth: '260px' });
+  popup.on('close', () => { openId = null; });
+  map.on('click', 'st', (e) => {
+    openId = e.features[0].properties.id;
+    popup.setLngLat(e.features[0].geometry.coordinates);
+    renderPopup(openId);
+    popup.addTo(map);
+  });
+  map.on('mouseenter', 'st', () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', 'st', () => { map.getCanvas().style.cursor = ''; });
+  refresh();
+  // Pick up other people's check-offs.
+  setInterval(async () => { await loadDone(); refresh(); }, 60000);
+});
+</script>
+</body>
+</html>
