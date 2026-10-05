@@ -173,7 +173,7 @@ function stationData() {
 function routeData() {
   const line = (r, color) => ({ type: 'Feature', properties: { col: color },
     geometry: { type: 'LineString', coordinates: [r.start, ...r.stops.map((id) => byId[id]), r.end].map((p) => [p.lng, p.lat]) } });
-  if (showingDays()) return { type: 'FeatureCollection', features: campaign.days.map((d, i) => line({ ...campaign, stops: d.stops }, dayColor(i))) };
+  if (showingDays()) return { type: 'FeatureCollection', features: campaign.days.map((d, i) => line({ ...campaign, stops: d.stops, end: d.end || campaign.end }, dayColor(i))) };
   return { type: 'FeatureCollection', features: plan ? [line(plan, '#2563eb')] : [] };
 }
 
@@ -291,13 +291,15 @@ function routeHTML() {
     t += plan.legs[i] + (i ? plan.dwell : 0);
     return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
   }).join('');
+  const lastLeg = plan.legs[plan.legs.length - 1];
+  const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
   const nx = nextStop();
   return `<h3>${plan.day ? `Day ${plan.day} of ${plan.of} · ` : ''}${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
     <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
-      · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
+      · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
     ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
       : '<div class="note">Every stop on this route is done.</div>'}
-    <ol class="stops">${rows}</ol>
+    <ol class="stops">${rows}${endRow}</ol>
     <div class="row"><button class="big plain" data-act="planner">Change</button>${campaign ? '<button class="big plain" data-act="days">All days</button>' : ''}<button class="big plain" data-act="clear">Clear route</button></div>
     <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
 }
@@ -312,6 +314,7 @@ function daysHTML() {
   }).join('');
   return `<h3>${c.days.length} days · about ${fmtMin(c.days.reduce((t, d) => t + d.total, 0))} in all</h3>
     <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[c.mode]} · ${c.limitText} a day · ${c.dwell} min per stop · ${esc(c.start.label)} → ${esc(c.end.label)}</div>
+    ${c.toDC ? `<div class="note">${c.mode === 'bike' ? 'Each day ends with the ride to the nearest Metro station; the train to DC isn\'t counted.' : 'Each day ends at its last stop; the drive to DC isn\'t counted.'}</div>` : ''}
     ${c.skipped ? `<div class="note">${c.skipped} station${c.skipped > 1 ? 's are' : ' is'} too far to fit in one day at this limit and ${c.skipped > 1 ? 'are' : 'is'} left out.</div>` : ''}
     <ol class="stops">${rows}</ol>
     <div class="note">Tap a day to make it today's route. ${left < all.length ? 'Some stations are done since this plan was made; plan again to fold the rest into fewer days.' : 'Finished stations drop out each time you plan again.'}</div>
@@ -347,7 +350,8 @@ $('routeBtn').onclick = () => show({ kind: plan ? 'route' : campaign ? 'days' : 
 
 function loadDay(i) {
   const d = campaign.days[i];
-  plan = { ...d, mode: campaign.mode, dwell: campaign.dwell, start: campaign.start, end: campaign.end, estimated: campaign.estimated,
+  plan = { ...d, mode: campaign.mode, dwell: campaign.dwell, start: campaign.start, end: d.end || campaign.end, after: campaign.after,
+           estimated: campaign.estimated,
            day: i + 1, of: campaign.days.length, made: Date.now() };
   store('si-plan', plan);
   show({ kind: 'route' });
@@ -399,7 +403,7 @@ function place(which) {
   const v = which === 'end' && form.end === 'same' ? form.start : form[which];
   const src = which === 'end' && form.end === 'same' ? 'start' : which;
   if (v === 'wf') return Promise.resolve({ kind: 'station', id: WITTER, lat: byId[WITTER].lat, lng: byId[WITTER].lng, label: 'BCD' });
-  if (v === 'cp') { const a = routes.anchors[0]; return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: 'DC' }); }
+  if (v === 'cp') { const a = routes.anchors.find((x) => x.id === 'cp'); return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: 'DC' }); }
   if (v === 'picked' && picked[src]) return Promise.resolve(picked[src]);
   return getLocation().then((me) => ({ kind: 'spot', lat: me.lat, lng: me.lng, label: 'Your location' }));
 }
@@ -550,21 +554,32 @@ async function makePlan(kind) {
       if (a === E || b === S) return 1e6;
       return M[a][b];
     };
+    // Heading to DC: driving, the day ends at the last stop (the drive home isn't counted); biking, it ends with
+    // the ride to whichever Metro station is quickest from the last stop (the train to DC isn't counted).
+    const toDC = pe.id === 'cp' && (mode === 'drive' || mode === 'bike');
+    const metros = routes.anchors.filter((a) => a.metro).map((a) => ({ a, i: routes.ids.indexOf(a.id) }));
+    const metroFor = (x) => metros.reduce((b, m) => (M[x][m.i] < M[x][b.i] ? m : b));
+    const Td = !toDC ? T : (a, b) => b !== E ? T(a, b) : a === S || mode === 'drive' ? 0 : M[a][metroFor(a).i];
     const cand = stations.filter((st) => !done[st.id]).map((st) => routes.ids.indexOf(st.id));
     const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : form.limit === 'time' ? { minutes: form.hours * 60 } : {};
     if (!cand.length) throw new Error('Every station is already done.');
-    const days = planDays(cand, T, S, E, limit, dwell);
+    const days = planDays(cand, Td, S, E, limit, dwell);
     if (!days.length) throw new Error('Not enough time for even one stop. Try more time.');
     const sum = (order) => {
       const path = [S, ...order, E], legs = [];
-      for (let i = 1; i < path.length; i++) legs.push(T(path[i - 1], path[i]));
+      for (let i = 1; i < path.length; i++) legs.push(Td(path[i - 1], path[i]));
       const travel = legs.reduce((a, b) => a + b, 0);
-      return { stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell };
+      const day = { stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell };
+      const last = order[order.length - 1];
+      if (toDC && mode === 'bike') { const m = metroFor(last).a; day.end = { kind: 'anchor', id: m.id, lat: m.lat, lng: m.lng, label: m.name }; }
+      if (toDC && mode === 'drive') { const st = byId[routes.ids[last]]; day.end = { kind: 'station', id: st.id, lat: st.lat, lng: st.lng, label: 'last stop' }; }
+      return day;
     };
     // The fullest day goes first: it is what "Plan today" hands you. The rest stay nearest-first.
     const full = days.reduce((bi, d, i) => (d.length > days[bi].length ? i : bi), 0);
     const ordered = [days[full], ...days.filter((_, i) => i !== full)];
-    campaign = { mode, dwell, start: ps, end: pe, estimated: ls.estimated || le.estimated, made: Date.now(),
+    campaign = { mode, dwell, start: ps, end: pe, estimated: ls.estimated || le.estimated, made: Date.now(), toDC,
+                 after: toDC ? (mode === 'bike' ? 'then Metro to DC (not counted)' : 'then drive to DC (not counted)') : '',
                  limitText: limit.count ? `${limit.count} stations` : limit.minutes ? fmtMin(limit.minutes) : 'everything',
                  skipped: cand.length - days.flat().length, days: ordered.map(sum) };
     store('si-days', campaign);
@@ -578,7 +593,7 @@ async function makePlan(kind) {
 
 function fitAll(ids, ends) {
   const b = new maplibregl.LngLatBounds();
-  [ends.start, ends.end, ...ids.map((id) => byId[id])].forEach((p) => b.extend([p.lng, p.lat]));
+  [ends.start, ends.toDC ? null : ends.end, ...ids.map((id) => byId[id])].filter(Boolean).forEach((p) => b.extend([p.lng, p.lat]));
   map.fitBounds(b, { padding: padding(), maxZoom: 16 });
 }
 const fitPlan = () => fitAll(plan.stops, plan);
@@ -588,7 +603,7 @@ const ends = {};
 function drawEnds() {
   for (const k of ['start', 'end']) {
     const src = showingDays() ? campaign : plan;
-    const p = src?.[k];
+    const p = k === 'end' && showingDays() && campaign.toDC ? null : src?.[k];
     if (!p) { ends[k]?.remove(); continue; }
     const same = src.start.lat === src.end.lat && src.start.lng === src.end.lng;
     if (k === 'end' && same) { ends[k]?.remove(); continue; }
