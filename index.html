@@ -253,7 +253,7 @@ $locate.addEventListener('click', () => {
     // Inside an embed the browser may refuse location outright; the full page can still ask.
     const full = window.self !== window.top
       ? ` <a href="${location.href}" target="_blank" rel="noopener">Open the map on its own page</a> to use your location.` : '';
-    say(err.code === err.PERMISSION_DENIED
+    say((err.code === err.PERMISSION_DENIED
       ? `Location is blocked here.${full || ' On iPhone: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using the App. Then in Safari tap <b>aA</b> → Website Settings → Location → Allow, and try again.'}`
       : 'Could not get your location. Try again in a moment.')
       + `<br><small style="color:var(--muted)">(${err.code}: ${esc(err.message || 'no detail')}${window.self !== window.top ? ', embedded' : ''})</small>`);
