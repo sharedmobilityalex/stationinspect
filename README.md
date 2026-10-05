@@ -20,20 +20,19 @@ The route button (top right) opens two tabs.
 
 **Project** plans every station left as a set of trips and keeps that plan (in Firebase, `plans/project`) until it is changed, so it is the same in the Tally embed, the full page and on any device.
 
-- Trip kinds, each driven or biked, whichever is quicker for its stations:
-  - Morning: DC → stations → BCD before work, up to 2 h by default. Counts only the time beyond the usual commute.
+- Trip kinds, each driven or biked:
+  - Morning: DC → stations → BCD before work, up to 2 h. Counts only the time beyond the usual commute.
   - Afternoon: BCD → stations → home to DC, up to 4 h.
-  - Extended: the same, leaving work early, up to 6 h.
-  - All day: DC → stations → DC, no office, up to 7 h.
+  - All day: DC → stations → DC, up to 7 h, at most 2 by default.
+  - Extended: DC → stations → DC on a work-from-home day, up to 6 h.
   - Heading home to DC, the drive isn't counted; by bike, the ride to the nearest Metro station is and the train isn't.
-- Settings turn kinds on or off and set their limits, minutes at each stop and getting-started minutes per trip.
-- The planner groups stations into whichever mix of trips takes the least of your time (savings-based grouping, then stations moved between trips and small trips folded in while that lowers the total).
-- "Suggested now" offers a morning trip before 11 and an afternoon kind after. Tap any trip to use it as the route.
-- **Update plan** appears once stations have been finished since the plan was made: it drops them and re-tidies the trips. **Settings / re-plan** starts again from scratch.
+- Settings turn kinds on or off and set each kind's longest trip and most trips, plus minutes at each stop.
+- The planner finds the fewest trips, then the least total time. For each trip count from the smallest possible it runs a few thousand rounds of removing a handful of stations and putting them back where they fit best, with route ordering inside each trip, in a background worker (about half a minute on a phone). At 10 minutes per stop the 72 stations need 3 trips; at 9 or fewer, 2 all-day trips are enough.
+- **Update plan** appears once stations have been finished since the plan was made and plans the rest again. **Settings** changes the limits and re-plans.
 
 **Quick trip** is a one-off route from BCD, DC, your location or any spot or station tapped on the map, for a number of stations or a time. It doesn't change the project plan.
 
-The eye button shows or hides the planned route on the map. Tapping a station always opens its pop-up (name, number, docks, where it sits in the plan, Mark as done) without leaving the route list.
+The eye button shows or hides the planned route on the map. Tapping a station opens its details at the bottom (name, number, docks, Mark as done); closing them returns to the trip.
 
 Travel times come from `routes.json`. Times to a tapped spot or your location are fetched live; if routing doesn't answer within 15 seconds, the trip uses an estimate and says so.
 

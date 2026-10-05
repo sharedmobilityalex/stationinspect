@@ -70,21 +70,22 @@
   .me { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
   .end { padding: 2px 6px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
   #eyeBtn[aria-pressed="false"] { color: var(--muted); }
-  .maplibregl-popup-content { padding: 12px 14px 10px; border-radius: 10px; min-width: 210px; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
-  .maplibregl-popup-close-button { font-size: 22px; width: 36px; height: 36px; color: var(--muted); }
-  .pop h4 { margin: 0 0 2px; font-size: 15px; padding-right: 26px; }
-  .pop .meta { margin-bottom: 6px; }
-  .pop .big { padding: 10px; font-size: 15px; margin-top: 6px; }
   .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; vertical-align: 1px; }
   .chk { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
   .chk label { flex: 1; display: flex; gap: 8px; align-items: center; font-weight: 600; }
   .chk input[type=checkbox] { width: 20px; height: 20px; }
-  .chk input[type=number] { width: 70px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
+  .chk input[type=number] { width: 56px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
   .chk small { color: var(--muted); font-weight: 400; }
+  .krow { display: grid; grid-template-columns: 1fr 68px 68px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .krow.head { border-top: 0; padding: 0; font-size: 12px; color: var(--muted); }
+  .krow.head span { text-align: center; }
+  .krow label { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+  .krow label small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+  .krow input[type=checkbox] { width: 20px; height: 20px; flex: none; }
+  .krow input[type=number] { width: 100%; box-sizing: border-box; padding: 9px 6px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; text-align: center; }
   .tabs { display: flex; gap: 6px; margin: 2px 0 10px; }
   .tabs button { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 600; }
   .tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .suggest { border: 2px solid var(--blue); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
   #picking { position: absolute; left: 10px; right: 10px; top: 104px; max-width: 360px; z-index: 3; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
   #picking span { flex: 1; }
   #picking button { border: 0; background: none; color: var(--blue); font-weight: 600; cursor: pointer; padding: 8px; }
@@ -153,7 +154,7 @@ const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStor
 
 let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
 let view = null;            // what the panel shows: { kind: 'project' | 'setup' | 'route' | 'quick' }
-let away = null, meMarker, popId = null;
+let away = null, meMarker;
 let quick = store('si-plan');                 // a quick trip planned on this device
 let active = store('si-active');              // { made, i }: the project trip in use on this device
 let showRoute = store('si-show') ?? true;     // route lines and numbers on the map
@@ -186,15 +187,19 @@ const MODE = { drive: 'Drive', bike: 'Bike' };
 // ---------- Trip kinds ----------
 // Every project trip is one of these, driven or biked. Morning trips count only the time beyond the usual
 // commute; heading home to DC, the drive isn't counted, and by bike only the ride to the Metro is.
+// All day comes before Extended so that, when either would do, the trip is called All day.
 const KINDS = {
-  morning:   { name: 'Morning',   from: 'DC',  to: 'BCD', hours: 2, color: '#d97706', commuteIn: true,  when: 'before work' },
-  afternoon: { name: 'Afternoon', from: 'BCD', to: 'DC',  hours: 4, color: '#2563eb', commuteOut: true, when: 'after work' },
-  extended:  { name: 'Extended',  from: 'BCD', to: 'DC',  hours: 6, color: '#7c3aed', commuteOut: true, when: 'leave work early' },
-  allday:    { name: 'All day',   from: 'DC',  to: 'DC',  hours: 7, color: '#0d9488', when: 'no office day' },
+  morning:   { name: 'Morning',   from: 'DC',  to: 'BCD', hours: 2, color: '#d97706', commuteIn: true },
+  afternoon: { name: 'Afternoon', from: 'BCD', to: 'DC',  hours: 4, color: '#2563eb', commuteOut: true },
+  allday:    { name: 'All day',   from: 'DC',  to: 'DC',  hours: 7, color: '#0d9488', max: 2 },
+  extended:  { name: 'Extended',  from: 'DC',  to: 'DC',  hours: 6, color: '#7c3aed' },
 };
-const defaultSettings = () => ({ kinds: Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, { on: true, hours: v.hours }])),
-                                 modes: { drive: true, bike: true }, dwell: 10, setup: 10 });
+const defaultSettings = () => ({ kinds: Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, { on: true, hours: v.hours, max: v.max ?? null }])),
+                                 modes: { drive: true, bike: true }, dwell: 10 });
 let settings = store('si-settings') || defaultSettings();
+// Settings saved by earlier versions: drop getting-started minutes, add trip limits.
+delete settings.setup;
+for (const k of Object.keys(KINDS)) settings.kinds[k] ??= { on: true, hours: KINDS[k].hours, max: KINDS[k].max ?? null };
 
 const ix = (id) => routes.ids.indexOf(id);
 // Travel rules for one kind of trip by one mode, over matrix indices.
@@ -215,101 +220,177 @@ function variant(kind, mode) {
   const pt = (i) => { const id = routes.ids[i]; const a = byId[id] || routes.anchors.find((q) => q.id === id); return { id, lat: a.lat, lng: a.lng, name: a.name }; };
   const start = (r) => k.from === 'DC' ? (mode === 'drive' ? { ...pt(DC), label: 'DC' } : { ...pt(metroIn[r[0]]), label: `${pt(metroIn[r[0]]).name} (Metro from DC)` }) : { ...pt(B), label: 'BCD' };
   const end = (r) => k.to === 'DC'
-    ? (mode === 'drive' ? { ...pt(r[r.length - 1]), label: 'last stop', after: 'then drive home (not counted)' }
-      : { ...pt(metroOut[r[r.length - 1]]), label: pt(metroOut[r[r.length - 1]]).name, after: 'then Metro home (not counted)' })
+    ? (mode === 'drive' ? { ...pt(r[r.length - 1]), label: 'last stop', after: 'then drive home' }
+      : { ...pt(metroOut[r[r.length - 1]]), label: pt(metroOut[r[r.length - 1]]).name, after: 'then Metro home' })
     : { ...pt(B), label: 'BCD' };
-  return { kind, mode, M, first, last, base, start, end, cap: (settings.kinds[kind]?.hours ?? k.hours) * 60 };
+  return { kind, mode, M, first, last, base, start, end };
 }
 
-// ---------- Project planner ----------
-// Splits stations into trips of whichever kind and mode costs least, each within its kind's time limit.
-// Savings joins build compact trips; stations then move between trips, and small trips are folded into
-// others, whenever that lowers the total counted time. Starting from existing trips just re-tidies them.
-function planProject(cand, initial) {
-  const V = [];
-  for (const k of Object.keys(KINDS)) if (settings.kinds[k]?.on) for (const m of ['drive', 'bike']) if (settings.modes[m]) V.push(variant(k, m));
-  if (!V.length) throw new Error('Turn on at least one kind of trip and one way of getting around.');
-  const dwell = settings.dwell, setup = settings.setup;
-  const travel = (v, r) => { if (!r.length) return 0; let c = v.first(r[0]); for (let i = 1; i < r.length; i++) c += v.M[r[i - 1]][r[i]]; return c + v.last(r[r.length - 1]); };
-  const dur = (v, r) => travel(v, r) + r.length * dwell;
-  const cost = (v, r) => dur(v, r) + setup - v.base;
-  const fits = (v, r) => dur(v, r) <= v.cap;
-  const tidy = (v, r) => { const S = -1, E = -2;
-    const T = (a, b) => a === b ? 0 : a === S ? (b === E ? 0 : v.first(b)) : b === E ? v.last(a) : (a === E || b === S) ? 1e6 : v.M[a][b];
-    return solve(r, T, S, E, {}, dwell); };
-  const best = (r) => { let b = null; for (const v of V) { const o = tidy(v, r); if (!fits(v, o)) continue; const c = cost(v, o); if (!b || c < b.c) b = { v, r: o, c }; } return b; };
-  let trips = [], skipped = [];
-  if (initial) {
-    for (const t of initial) { if (!t.length) continue; const b = best(t); if (b) trips.push(b); else t.forEach((x) => { const s1 = best([x]); if (s1) trips.push(s1); else skipped.push(x); }); }
-  } else {
-    for (const x of cand) { const b = best([x]); if (b) trips.push(b); else skipped.push(x); }
-    const sav = [];
-    for (const v of V) for (const t1 of trips) for (const t2 of trips) {
-      const i = t1.r[0], j = t2.r[0]; if (i === j) continue;
-      const g = v.last(i) + v.first(j) + setup - v.base - v.M[i][j]; if (g > 0) sav.push([g, v, i, j]);
-    }
-    sav.sort((a, b) => b[0] - a[0]);
-    const of = new Map(trips.map((t) => [t.r[0], t]));
-    for (const [, v, i, j] of sav) {
-      const a = of.get(i), b = of.get(j);
-      if (!a || !b || a === b || a.r[a.r.length - 1] !== i || b.r[0] !== j) continue;
-      const r = [...a.r, ...b.r]; if (!fits(v, r)) continue;
-      const c = cost(v, r); if (c >= a.c + b.c) continue;
-      const m = { v, r, c }; trips = trips.filter((t) => t !== a && t !== b); trips.push(m); r.forEach((x) => of.set(x, m));
-    }
-    trips = trips.map((t) => best(t.r) || t);
-  }
-  // Price of putting x into trip t at its cheapest spot, and of taking x out, under the trip's own rules.
-  const ins = (t, x) => { const { v, r } = t; let b = null;
-    for (let k = 0; k <= r.length; k++) {
-      const a = k ? v.M[r[k - 1]][x] : v.first(x), c = k < r.length ? v.M[x][r[k]] : v.last(x);
-      const o = k ? (k < r.length ? v.M[r[k - 1]][r[k]] : v.last(r[k - 1])) : (r.length ? v.first(r[0]) : 0);
-      const d = a + c - o + dwell; if (!b || d < b.d) b = { d, k };
-    } return b; };
-  const rem = (t, x) => { const { v, r } = t, k = r.indexOf(x); if (r.length === 1) return t.c;
-    const a = k ? v.M[r[k - 1]][x] : v.first(x), c = k < r.length - 1 ? v.M[x][r[k + 1]] : v.last(x);
-    const o = k === 0 ? v.first(r[1]) : k === r.length - 1 ? v.last(r[k - 1]) : v.M[r[k - 1]][r[k + 1]];
-    return a + c - o + dwell; };
-  for (let pass = 0, moved = true; moved && pass < 10; pass++) {
-    moved = false;
-    for (const A of trips.slice()) for (const x of A.r.slice()) {
-      if (!trips.includes(A)) break;
-      const gain = rem(A, x); let bb = null;
-      for (const B of trips) { if (B === A) continue; const i = ins(B, x); if (i.d < gain - 1e-6 && (!bb || i.d < bb.i.d)) bb = { B, i }; }
-      if (!bb) continue;
-      const rest = A.r.filter((y) => y !== x), Ar = rest.length ? best(rest) : { c: 0, r: [] };
-      const Bn = best([...bb.B.r.slice(0, bb.i.k), x, ...bb.B.r.slice(bb.i.k)]);
-      if (Ar && Bn && Ar.c + Bn.c < A.c + bb.B.c - 1e-6) { trips = trips.filter((t) => t !== A && t !== bb.B); if (Ar.r.length) trips.push(Ar); trips.push(Bn); moved = true; }
-    }
-  }
-  for (let again = true; again;) {
-    again = false;
-    for (const A of trips.slice().sort((x, y) => x.r.length - y.r.length)) {
-      let others = trips.filter((t) => t !== A).map((t) => ({ ...t })), ok = true;
-      for (const x of A.r) {
-        let bb = null, bi = -1;
-        others.forEach((t, i) => { const q = ins(t, x); const r = [...t.r.slice(0, q.k), x, ...t.r.slice(q.k)]; if (fits(t.v, r) && (!bb || q.d < bb.d)) { bb = { d: q.d, r }; bi = i; } });
-        if (!bb) { ok = false; break; }
-        const nb = best(bb.r); if (!nb) { ok = false; break; } others[bi] = nb;
+// ---------- Project planner (runs in a background worker) ----------
+// Fewest trips first, then least counted time. For each trip count from the smallest possible, it starts
+// from compact geographic groups and runs a few thousand rounds of "pull out a handful of stations and put
+// them back where they fit best" (keeping a worse arrangement now and then, less often as it goes), with
+// 2-opt and or-opt ordering inside each trip. The first trip count with every trip inside its limit wins.
+function plannerWorker() {
+  self.onmessage = (ev) => {
+    const { M: MM, ids, anchors, coords, cand, cfg, bcd } = ev.data;
+    const ix = (id) => ids.indexOf(id), DC = ix('cp'), B = ix(bcd), n = coords.length, dwell = cfg.dwell;
+    const metros = anchors.filter((a) => a.metro).map((a) => ix(a.id));
+    const V = [];
+    for (const [kind, k] of cfg.kinds) for (const mode of cfg.modes) {
+      const M = MM[mode], F = new Float64Array(n), L = new Float64Array(n);
+      for (let x = 0; x < n; x++) {
+        const mIn = metros.reduce((b, m) => (M[m][x] < M[b][x] ? m : b)), mOut = metros.reduce((b, m) => (M[x][m] < M[x][b] ? m : b));
+        F[x] = k.from === 'DC' ? (mode === 'drive' ? M[DC][x] : M[mIn][x]) : M[B][x];
+        L[x] = k.to === 'DC' ? (mode === 'drive' ? 0 : M[x][mOut]) : M[x][B];
       }
-      if (ok && others.reduce((t, o) => t + o.c, 0) < trips.reduce((t, o) => t + o.c, 0) - 1e-6) { trips = others; again = true; break; }
+      let base = 0;
+      if (k.commuteIn) base += mode === 'drive' ? M[DC][B] : Math.min(...metros.map((m) => M[m][B]));
+      if (k.commuteOut && mode === 'bike') base += Math.min(...metros.map((m) => M[B][m]));
+      V.push({ kind, mode, M, F, L, base, cap: k.hours * 60, max: k.max || Infinity });
     }
-  }
-  // Mornings first, then afternoons, extended, all day; within a kind, the cheapest first.
-  const order = Object.keys(KINDS);
-  trips.sort((a, b) => order.indexOf(a.v.kind) - order.indexOf(b.v.kind) || a.c - b.c);
-  return { trips: trips.map((t) => ({ kind: t.v.kind, mode: t.v.mode, stops: t.r.map((i) => routes.ids[i]) })), skipped: skipped.map((i) => routes.ids[i]) };
+    let seed = 12345; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const travel = (v, r) => { if (!r.length) return 0; let c = v.F[r[0]]; for (let i = 1; i < r.length; i++) c += v.M[r[i - 1]][r[i]]; return c + v.L[r[r.length - 1]]; };
+    const dur = (t) => travel(t.v, t.r) + t.r.length * dwell;
+    const cost = (t) => t.r.length ? dur(t) - t.v.base : 0;
+    const over = (t) => Math.max(0, dur(t) - t.v.cap);
+    const PEN = 50, score = (S) => S.reduce((a, t) => a + cost(t) + PEN * over(t), 0);
+    const clone = (S) => S.map((t) => ({ v: t.v, r: t.r.slice() }));
+    function improve(t) {
+      const v = t.v, M = v.M, r = t.r, m = r.length;
+      if (m < 2) return;
+      const fw = new Float64Array(m), bw = new Float64Array(m);
+      const sums = () => { for (let k = 1; k < m; k++) { fw[k] = fw[k - 1] + M[r[k - 1]][r[k]]; bw[k] = bw[k - 1] + M[r[k]][r[k - 1]]; } };
+      const eIn = (p, x) => p === null ? v.F[x] : M[p][x], eOut = (x, q) => q === null ? v.L[x] : M[x][q];
+      const link = (p, q) => p === null ? (q === null ? 0 : v.F[q]) : (q === null ? v.L[p] : M[p][q]);
+      sums();
+      for (let better = true, guard = 0; better && guard < 300; guard++) {
+        better = false;
+        for (let i = 0; i < m - 1 && !better; i++) for (let j = i + 1; j < m; j++) {
+          const p = i ? r[i - 1] : null, q = j + 1 < m ? r[j + 1] : null;
+          if (eIn(p, r[j]) + (bw[j] - bw[i]) + eOut(r[i], q) < eIn(p, r[i]) + (fw[j] - fw[i]) + eOut(r[j], q) - 1e-9) {
+            const seg = r.slice(i, j + 1).reverse(); r.splice(i, j - i + 1, ...seg); sums(); better = true; break;
+          }
+        }
+        for (let len = 1; len <= 3 && !better; len++) for (let i = 0; i + len <= m && !better; i++) {
+          const a = i ? r[i - 1] : null, b = i + len < m ? r[i + len] : null, s0 = r[i], s1 = r[i + len - 1];
+          const gain = eIn(a, s0) + eOut(s1, b) - link(a, b);
+          for (let j = 0; j <= m; j++) {
+            if (j >= i && j <= i + len) continue;
+            const p = j ? r[j - 1] : null, q = j < m ? r[j] : null;
+            if (eIn(p, s0) + eOut(s1, q) - link(p, q) < gain - 1e-9) {
+              const seg = r.splice(i, len); r.splice(j > i ? j - len : j, 0, ...seg); sums(); better = true; break;
+            }
+          }
+        }
+      }
+    }
+    function pickVariant(t, S) {
+      const used = {}; for (const u of S) if (u !== t && u.r.length) used[u.v.kind] = (used[u.v.kind] || 0) + 1;
+      let best = null;
+      for (const v of V) {
+        if ((used[v.kind] || 0) >= v.max) continue;
+        const tt = { v, r: t.r.slice() }; improve(tt);
+        const sc = cost(tt) + PEN * over(tt);
+        if (!best || sc < best.sc - 1e-9) best = { sc, tt };
+      }
+      if (best) { t.v = best.tt.v; t.r = best.tt.r; }
+    }
+    function insertAt(t, x) {
+      const { v, r } = t, d0 = dur(t), o0 = Math.max(0, d0 - v.cap); let best = { d: Infinity, k: 0 };
+      for (let k = 0; k <= r.length; k++) {
+        const a = k ? v.M[r[k - 1]][x] : v.F[x], c = k < r.length ? v.M[x][r[k]] : v.L[x];
+        const o = k ? (k < r.length ? v.M[r[k - 1]][r[k]] : v.L[r[k - 1]]) : (r.length ? v.F[r[0]] : 0);
+        const dd = a + c - o + dwell, d = dd + PEN * (Math.max(0, d0 + dd - v.cap) - o0);
+        if (d < best.d) best = { d, k };
+      }
+      return best;
+    }
+    const near = (a, b) => MM.drive[a][b] + MM.drive[b][a];
+    function solveK(K, iters, init, report) {
+      let start = null, startSc = Infinity;
+      const tries = init ? [init] : [];
+      for (let rs = 0; rs < 8; rs++) {
+        let cents = cand.slice().sort(() => rand() - 0.5).slice(0, K).map((i) => coords[i]), asg = [];
+        for (let it = 0; it < 15; it++) {
+          asg = cand.map((i) => { let b = 0, bd = Infinity; cents.forEach((c, k) => { const d = (coords[i][0] - c[0]) ** 2 + ((coords[i][1] - c[1]) * 0.78) ** 2; if (d < bd) { bd = d; b = k; } }); return b; });
+          cents = cents.map((c, k) => { const mm = cand.filter((_, j) => asg[j] === k); return mm.length ? [mm.reduce((a, i) => a + coords[i][0], 0) / mm.length, mm.reduce((a, i) => a + coords[i][1], 0) / mm.length] : c; });
+        }
+        const S = Array.from({ length: K }, () => ({ v: V[0], r: [] }));
+        cand.forEach((i, j) => S[asg[j]].r.push(i));
+        tries.push(S.filter((t) => t.r.length));
+      }
+      for (const S of tries) { for (const t of S) pickVariant(t, S); const sc = score(S); if (sc < startSc) { startSc = sc; start = S; } }
+      let cur = clone(start), curSc = startSc, best = clone(start), bestSc = startSc;
+      for (let it = 0; it < iters; it++) {
+        if (it % 250 === 0) report(it / iters);
+        const T = 20 * Math.pow(0.002, it / iters), S = clone(cur), all = S.flatMap((t) => t.r);
+        const q = Math.min(all.length, 3 + Math.floor(rand() * 10));
+        let removed;
+        if (rand() < 0.5) { const s0 = all[Math.floor(rand() * all.length)]; removed = all.slice().sort((a, b) => near(s0, a) - near(s0, b)).slice(0, q); }
+        else removed = all.slice().sort(() => rand() - 0.5).slice(0, q);
+        const rs = new Set(removed);
+        for (const t of S) t.r = t.r.filter((x) => !rs.has(x));
+        // put them back, hardest-to-place first (largest gap between best and second-best spot)
+        while (removed.length) {
+          let pi = -1, pt = null, pk = 0, reg = -Infinity;
+          removed.forEach((x, li) => {
+            const c = S.map((t) => ({ t, ...insertAt(t, x) })).sort((a, b) => a.d - b.d);
+            const g = (c[1] ? c[1].d : 1e6) - c[0].d;
+            if (g > reg) { reg = g; pi = li; pt = c[0].t; pk = c[0].k; }
+          });
+          pt.r.splice(pk, 0, removed[pi]); removed.splice(pi, 1);
+        }
+        for (const t of S) improve(t);
+        if (rand() < 0.15) for (const t of S) pickVariant(t, S);
+        const sc = score(S);
+        if (sc < curSc || rand() < Math.exp((curSc - sc) / T)) { cur = S; curSc = sc; }
+        if (sc < bestSc) { best = clone(S); bestSc = sc; }
+      }
+      for (const t of best) pickVariant(t, best);
+      return { S: best.filter((t) => t.r.length), feasible: best.every((t) => over(t) < 1e-6) };
+    }
+    const skipped = cand.filter((x) => !V.some((v) => v.F[x] + dwell + v.L[x] <= v.cap));
+    const keep = new Set(skipped); for (let i = cand.length - 1; i >= 0; i--) if (keep.has(cand[i])) cand.splice(i, 1);
+    const maxCap = Math.max(...V.map((v) => v.cap));
+    const lo = Math.max(1, Math.ceil(cand.length * dwell / maxCap));
+    const init = ev.data.init ? ev.data.init.map((t) => ({ v: V[0], r: t.filter((x) => cand.includes(x)) })).filter((t) => t.r.length) : null;
+    for (let K = lo; K <= cand.length; K++) {
+      const res = solveK(K, cfg.iters, init && init.length === K ? init : null, (f) => self.postMessage({ progress: f, K }));
+      if (res.feasible) {
+        const order = cfg.kinds.map(([k]) => k);
+        res.S.sort((a, b) => order.indexOf(a.v.kind) - order.indexOf(b.v.kind) || dur(b) - dur(a));
+        self.postMessage({ done: true, trips: res.S.map((t) => ({ kind: t.v.kind, mode: t.v.mode, stops: t.r.map((i) => ids[i]) })), skipped: skipped.map((i) => ids[i]) });
+        return;
+      }
+    }
+    self.postMessage({ done: true, trips: [], skipped: skipped.map((i) => ids[i]) });
+  };
+}
+let worker = null;
+function planProject(candIds, initial, onProgress) {
+  worker?.terminate();
+  worker = new Worker(URL.createObjectURL(new Blob([`(${plannerWorker})()`], { type: 'text/javascript' })));
+  const kinds = Object.entries(KINDS).filter(([k]) => settings.kinds[k].on)
+    .map(([k, v]) => [k, { from: v.from, to: v.to, commuteIn: !!v.commuteIn, commuteOut: !!v.commuteOut, hours: settings.kinds[k].hours, max: settings.kinds[k].max || 0 }]);
+  const modes = ['drive', 'bike'].filter((m) => settings.modes[m]);
+  if (!kinds.length || !modes.length) return Promise.reject(new Error('Turn on at least one kind of trip and Drive or Bike.'));
+  return new Promise((resolve) => {
+    worker.onmessage = (e) => { if (e.data.done) { worker.terminate(); worker = null; resolve(e.data); } else onProgress(e.data); };
+    worker.postMessage({ M: routes.min, ids: routes.ids, anchors: routes.anchors, bcd: WITTER,
+      coords: stations.map((s) => [s.lat, s.lng]), cand: candIds.map(ix), init: initial?.map((t) => t.map(ix)),
+      cfg: { kinds, modes, dwell: settings.dwell, iters: 4000 } });
+  });
 }
 
 // Times and end points of a saved trip, worked out from the travel table.
 function expand(t) {
+  if (!KINDS[t.kind]) return null;
   const v = variant(t.kind, t.mode), r = t.stops.map(ix).filter((i) => i >= 0);
   if (!r.length) return null;
   const legs = [v.first(r[0])]; for (let i = 1; i < r.length; i++) legs.push(v.M[r[i - 1]][r[i]]); legs.push(v.last(r[r.length - 1]));
-  const travel = legs.reduce((a, b) => a + b, 0), total = travel + r.length * settingsOf().dwell;
-  const end = v.end(r);
-  return { ...t, legs, travel, total, base: v.base,
-           start: v.start(r), end, after: end.after || '', dwell: settingsOf().dwell };
+  const dwell = settingsOf().dwell, travel = legs.reduce((a, b) => a + b, 0), total = travel + r.length * dwell, end = v.end(r);
+  return { ...t, legs, travel, total, base: v.base, start: v.start(r), end, after: end.after || '', dwell };
 }
 const settingsOf = () => project?.settings || settings;
 
@@ -348,7 +429,7 @@ if (live) {
 function currentRoute() {
   if (active && project?.trips?.[active.i] && routes) {
     const e = expand(project.trips[active.i]);
-    if (e) return { ...e, title: `${KINDS[e.kind].name} trip ${tripNumber(active.i)}`, fromProject: true };
+    if (e) return { ...e, title: tripName(active.i), fromProject: true };
   }
   return quick;
 }
@@ -365,7 +446,7 @@ function stationData() {
   return { type: 'FeatureCollection', features: stations.map((s) => ({
     type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
     properties: { id: s.id, name: s.name, done: !!done[s.id], lbl: lbl[s.id] || 0, col: col[s.id] || '',
-                  dim: !!focused && !lbl[s.id], sel: popId === s.id } })) };
+                  dim: !!focused && !lbl[s.id], sel: view?.kind === 'station' && view.id === s.id } })) };
 }
 
 function routeData() {
@@ -418,7 +499,6 @@ function refresh() {
   $('count').innerHTML = `${n} / ${stations.length} done <span class="lg"><span class="dot"></span>to do <span class="dot done"></span>done</span>`
     + (live ? '' : ' <span class="lg">(demo, not saved)</span>');
   if (view) render();
-  if (popId) renderPop();
 }
 
 $('eyeBtn').onclick = () => { showRoute = !showRoute; store('si-show', showRoute); refresh(); };
@@ -426,33 +506,43 @@ $('eyeBtn').onclick = () => { showRoute = !showRoute; store('si-show', showRoute
 // ---------- Panel ----------
 function show(v) { view = v; render(); refresh(); }
 function hideSheet() { view = null; $('sheet').hidden = true; refresh(); }
-$('close').onclick = hideSheet;
+// Closing a station's details goes back to the trip or plan it was opened over.
+$('close').onclick = () => (view?.kind === 'station' && view.back ? show(view.back) : hideSheet());
 
 function render() {
   $('sheet').hidden = false;
   const b = $('body');
-  b.innerHTML = view.kind === 'project' ? projectHTML() : view.kind === 'setup' ? setupHTML()
-    : view.kind === 'route' ? routeHTML() : quickHTML();
+  b.innerHTML = view.kind === 'station' ? stationHTML(view.id) : view.kind === 'project' ? projectHTML()
+    : view.kind === 'setup' ? setupHTML() : view.kind === 'route' ? routeHTML() : quickHTML();
   wire(b);
 }
 
 const tabs = (on) => `<div class="tabs"><button data-act="project" aria-pressed="${on === 'project'}">Project</button><button data-act="quick" aria-pressed="${on === 'quick'}">Quick trip</button></div>`;
+const tripName = (i) => `${KINDS[project.trips[i].kind].name} ${tripNumber(i)}`;
 
 function nextStop(plan, after) { return plan?.stops.find((id) => id !== after && !done[id]) || null; }
+
+function stationHTML(id) {
+  const s = byId[id], d = done[id], plan = currentRoute(), k = plan ? plan.stops.indexOf(id) : -1;
+  const when = pending.has(id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
+  return `<h3>${esc(s.name)}</h3>
+    <div class="meta">Station ${esc(s.num)} · ${s.docks} docks${k >= 0 ? ` · stop ${k + 1} of ${plan.stops.length}` : ''}</div>
+    ${away?.id === id ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
+    <button class="big ${d ? 'undo' : ''}" data-act="toggle" data-id="${id}">${d ? 'Undo' : 'Mark as done'}</button>
+    ${when ? `<div class="note">${when}</div>` : ''}`;
+}
 
 // Which saved trip suits right now: mornings before 11, afternoon kinds after.
 function suggested() {
   if (!project?.trips?.length) return -1;
-  const h = new Date().getHours(), want = h < 11 ? ['morning', 'allday'] : ['afternoon', 'extended', 'allday'];
-  const open = project.trips.map((t, i) => ({ t, i })).filter(({ t }) => t.stops.some((id) => !done[id]));
+  const h = new Date().getHours(), want = h < 11 ? ['morning', 'allday', 'extended'] : ['afternoon', 'allday', 'extended'];
+  const open = project.trips.map((t, i) => ({ t, i })).filter(({ t }) => KINDS[t.kind] && t.stops.some((id) => !done[id]));
   return (open.find(({ t }) => want.includes(t.kind)) || open[0] || { i: -1 }).i;
 }
 
 function projectHTML() {
-  if (!project?.trips?.length) return `${tabs('project')}<h3>Plan the whole project</h3>
-    <div class="meta">Split every station left into morning, afternoon, extended and all-day trips, and keep that plan until you change it.</div>
-    <button class="big blue" data-act="setup">Set up the plan</button>`;
-  if (!routes) return `${tabs('project')}<div class="note">Loading travel times…</div>`;
+  if (!project?.trips?.length) return `${tabs('project')}<h3>Project plan</h3><button class="big blue" data-act="setup">Set up the plan</button>`;
+  if (!routes) return `${tabs('project')}<div class="note">Loading…</div>`;
   const E = project.trips.map(expand);
   const all = project.trips.flatMap((t) => t.stops), left = all.filter((id) => !done[id]).length;
   const doneSince = all.filter((id) => done[id] && !project.doneAtMake.includes(id)).length;
@@ -461,38 +551,32 @@ function projectHTML() {
     if (!e) return '';
     const n = e.stops.filter((id) => done[id]).length, k = KINDS[e.kind];
     return `<li data-trip="${i}" class="${n === e.stops.length ? 'done' : ''}"><span class="n" style="background:${k.color}">${i + 1}</span>
-      <span class="nm"><span class="badge" style="background:${k.color}">${k.name}</span> ${MODE[e.mode]} · ${e.stops.length} stops · ${fmtMin(e.total)}${n ? ` · ${n} done` : ''}
-      <br><small style="color:var(--muted)">${esc(byId[e.stops[0]].name)} → ${esc(byId[e.stops[e.stops.length - 1]].name)}</small></span>
+      <span class="nm"><b>${tripName(i)}</b> · ${MODE[e.mode]} · ${e.stops.length} stops · ${fmtMin(e.total)}${n ? ` · ${n} done` : ''}
+      <br><small style="color:var(--muted)">${k.from} → ${esc(byId[e.stops[0]].name)} … ${esc(byId[e.stops[e.stops.length - 1]].name)} → ${k.to}</small></span>
       <span class="t">${active?.i === i ? 'in use' : ''}</span></li>`;
   }).join('');
-  const counted = E.reduce((t, e) => t + (e ? e.total - e.base : 0), 0);
-  return `${tabs('project')}<h3>${project.trips.length} trips · ${left} stations left</h3>
-    <div class="meta">About ${fmtMin(counted)} of your time beyond normal commuting · ${settingsOf().dwell} min per stop${projectRemote ? '' : ' · saved on this device only'}</div>
-    ${doneSince ? `<button class="big blue" data-act="update">Update plan (${doneSince} done since it was made)</button>` : ''}
-    ${sg >= 0 ? `<div class="suggest"><b>Suggested now:</b> ${KINDS[project.trips[sg].kind].name} trip ${tripNumber(sg)} (${KINDS[project.trips[sg].kind].when})
-      <button class="big blue" data-act="usetrip" data-id="${sg}">Use this trip</button></div>` : ''}
+  const total = E.reduce((t, e) => t + (e ? e.total - e.base : 0), 0);
+  return `${tabs('project')}<h3>${project.trips.length} trips · ${left} stations · ${fmtMin(total)}</h3>
+    ${projectRemote || !live ? '' : '<div class="meta">Saved on this device only</div>'}
+    ${doneSince ? `<button class="big blue" data-act="update">Update plan (${doneSince} done)</button>` : ''}
+    ${sg >= 0 && !doneSince ? `<button class="big blue" data-act="usetrip" data-id="${sg}">Start ${tripName(sg)}</button>` : ''}
     <ol class="stops">${rows}</ol>
-    <div class="note">Tap a trip to use it. Colours: ${Object.values(KINDS).map((k) => `<span class="badge" style="background:${k.color}">${k.name}</span>`).join(' ')}</div>
-    <div class="row"><button class="big plain" data-act="setup">Settings / re-plan</button></div>`;
+    <button class="big plain" data-act="setup">Settings</button>`;
 }
 
 function setupHTML() {
   const st = settings;
-  const kindRows = Object.entries(KINDS).map(([k, v]) => `<div class="chk"><label><input type="checkbox" data-kind="${k}" ${st.kinds[k].on ? 'checked' : ''}>
-      ${v.name} <small>${v.from} → ${v.to} · ${v.when}</small></label>
-      <input type="number" data-hours="${k}" min="0.5" max="12" step="0.5" inputmode="decimal" value="${st.kinds[k].hours}" aria-label="${v.name} hours"><small>h max</small></div>`).join('');
-  return `${tabs('project')}<h3>Project plan settings</h3>
-    <div class="meta">Which kinds of trips you're willing to do, and the longest each can be.</div>
+  const kindRows = Object.entries(KINDS).map(([k, v]) => `<div class="krow"><label><input type="checkbox" data-kind="${k}" ${st.kinds[k].on ? 'checked' : ''}>
+      <span>${v.name}<small>${v.from} → ${v.to}</small></span></label>
+      <input type="number" data-hours="${k}" min="0.5" max="12" step="0.5" inputmode="decimal" value="${st.kinds[k].hours}" aria-label="${v.name}, longest trip in hours">
+      <input type="number" data-max="${k}" min="0" max="30" inputmode="numeric" value="${st.kinds[k].max ?? ''}" placeholder="any" aria-label="${v.name}, most trips"></div>`).join('');
+  return `${tabs('project')}<h3>Plan settings</h3>
+    <div class="krow head"><span></span><span>Hours</span><span>Max trips</span></div>
     ${kindRows}
-    <label class="f">Getting around (each trip uses whichever is quicker)</label>
     <div class="chk"><label><input type="checkbox" data-mode="drive" ${st.modes.drive ? 'checked' : ''}> Drive</label><label><input type="checkbox" data-mode="bike" ${st.modes.bike ? 'checked' : ''}> Bike</label></div>
-    <div class="row">
-      <div><label class="f" for="sDwell">Minutes at each stop</label><input class="f" id="sDwell" data-set="dwell" type="number" min="0" max="60" inputmode="numeric" value="${st.dwell}"></div>
-      <div><label class="f" for="sSetup">Getting-started minutes per trip</label><input class="f" id="sSetup" data-set="setup" type="number" min="0" max="60" inputmode="numeric" value="${st.setup}"></div>
-    </div>
-    <button class="big blue" data-act="planproject">${project?.trips?.length ? 'Re-plan from scratch' : 'Plan the project'}</button>
-    ${project?.trips?.length ? '<button class="big plain" data-act="project">Back to the plan</button>' : ''}
-    <div class="note">Morning trips count only the time beyond your usual commute. Heading home to DC, the drive isn't counted; by bike, the ride to the Metro is and the train isn't. Finished stations are left out.</div>`;
+    <label class="f" for="sDwell">Minutes at each stop</label><input class="f" id="sDwell" data-set="dwell" type="number" min="0" max="60" inputmode="numeric" value="${st.dwell}">
+    <button class="big blue" data-act="planproject">${project?.trips?.length ? 'Re-plan' : 'Plan'}</button>
+    ${project?.trips?.length ? '<button class="big plain" data-act="project">Back</button>' : ''}`;
 }
 
 function routeHTML() {
@@ -507,16 +591,13 @@ function routeHTML() {
   const lastLeg = plan.legs[plan.legs.length - 1];
   const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
   const nx = nextStop(plan);
-  const head = plan.fromProject ? `${esc(plan.title)} · ${MODE[plan.mode]}` : `Quick trip · ${MODE[plan.mode]}`;
-  return `${tabs(plan.fromProject ? 'project' : 'quick')}<h3>${head} · ${plan.stops.length} stops · ${fmtMin(plan.total)}</h3>
-    <div class="meta">${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}
-      ${plan.fromProject && plan.base ? ` · ${fmtMin(Math.max(0, plan.total - plan.base))} more than your normal commute` : ''}</div>
-    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
-      : '<div class="note">Every stop on this route is done.</div>'}
+  const head = plan.fromProject ? esc(plan.title) : 'Quick trip';
+  return `${tabs(plan.fromProject ? 'project' : 'quick')}<h3>${head} · ${MODE[plan.mode]} · ${plan.stops.length} stops · ${fmtMin(plan.total)}</h3>
+    <div class="meta">${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · estimated times' : ''}</div>
+    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>` : ''}
     <ol class="stops">${rows}${endRow}</ol>
-    <div class="row">${plan.fromProject ? '<button class="big plain" data-act="project">Whole plan</button><button class="big plain" data-act="stoptrip">Stop using</button>'
-      : '<button class="big plain" data-act="quick">Change</button><button class="big plain" data-act="clear">Clear route</button>'}</div>
-    <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
+    <div class="row">${plan.fromProject ? '<button class="big plain" data-act="project">Plan</button><button class="big plain" data-act="stoptrip">Close trip</button>'
+      : '<button class="big plain" data-act="quick">Change</button><button class="big plain" data-act="clear">Clear</button>'}</div>`;
 }
 
 // ---------- Quick trip (one-off route from any start) ----------
@@ -536,18 +617,16 @@ function placeOptions(which) {
 function quickHTML() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-seg="${k}" data-v="${v}" aria-pressed="${form[k] === v}">${t}</button>`).join('')}</div>`;
   return `${tabs('quick')}<h3>Quick trip</h3>
-    <div class="meta">A one-off route from anywhere, separate from the project plan.</div>
     <label class="f" for="fStart">Start</label><select class="f" id="fStart" data-f="start">${placeOptions('start')}</select>
     <label class="f" for="fEnd">End</label><select class="f" id="fEnd" data-f="end">${placeOptions('end')}</select>
-    <label class="f">Getting around</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike']])}
+    <label class="f">Mode</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike']])}
     <label class="f">How much</label>${seg('limit', [['count', 'Stations'], ['time', 'Time']])}
     <div class="row">
       ${form.limit === 'count' ? `<div><label class="f" for="fCount">Stations</label><input class="f" id="fCount" data-f="count" type="number" min="1" max="72" inputmode="numeric" value="${form.count}"></div>` : ''}
       ${form.limit === 'time' ? `<div><label class="f" for="fHours">Hours</label><input class="f" id="fHours" data-f="hours" type="number" min="0.5" max="12" step="0.5" inputmode="decimal" value="${form.hours}"></div>` : ''}
       <div><label class="f" for="fDwell">Minutes at each stop</label><input class="f" id="fDwell" data-f="dwell" type="number" min="0" max="60" inputmode="numeric" value="${form.dwell}"></div>
     </div>
-    <button class="big blue" data-act="plan">Plan quick trip</button>
-    <div class="note">Picks a compact group that fits, from a split of every station left, so it doesn't strand scattered stations.</div>`;
+    <button class="big blue" data-act="plan">Plan</button>`;
 }
 
 function wire(b) {
@@ -562,6 +641,7 @@ function wire(b) {
   const saveSettings = () => store('si-settings', settings);
   b.querySelectorAll('[data-kind]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.kind].on = el.checked; saveSettings(); });
   b.querySelectorAll('[data-hours]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.hours].hours = Math.max(0.5, Number(el.value) || 1); saveSettings(); });
+  b.querySelectorAll('[data-max]').forEach((el) => el.onchange = () => { const v = parseInt(el.value, 10); settings.kinds[el.dataset.max].max = v > 0 ? v : null; saveSettings(); });
   b.querySelectorAll('[data-mode]').forEach((el) => el.onchange = () => { settings.modes[el.dataset.mode] = el.checked; saveSettings(); });
   b.querySelectorAll('[data-set]').forEach((el) => el.onchange = () => { settings[el.dataset.set] = Math.max(0, Number(el.value) || 0); saveSettings(); });
   b.querySelectorAll('ol.stops li[data-id]').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
@@ -569,7 +649,8 @@ function wire(b) {
 }
 
 function act(a, id) {
-  if (a === 'go') openStation(id, true);
+  if (a === 'toggle') toggle(byId[id]);
+  else if (a === 'go') openStation(id, true);
   else if (a === 'project') { show({ kind: 'project' }); fitProject(); }
   else if (a === 'setup') { if (project?.settings) settings = structuredClone(project.settings); show({ kind: 'setup' }); }
   else if (a === 'quick') show({ kind: 'quick' });
@@ -594,16 +675,15 @@ async function runProject(update) {
   const btn = $('body').querySelector(`[data-act="${update ? 'update' : 'planproject'}"]`);
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Planning…';
-  await new Promise((r) => setTimeout(r, 30));   // let the button repaint before the work starts
   try {
     await routesLoaded;
     if (update) settings = structuredClone(project.settings);
-    const cand = stations.filter((s) => !done[s.id]).map((s) => ix(s.id));
+    const cand = stations.filter((s) => !done[s.id]).map((s) => s.id);
     if (!cand.length) throw new Error('Every station is already done.');
-    const initial = update ? project.trips.map((t) => t.stops.filter((id) => !done[id]).map(ix)) : null;
-    const res = planProject(cand, initial);
-    if (!res.trips.length) throw new Error('No trip fits these limits. Allow longer trips.');
-    if (res.skipped.length) say(`${res.skipped.length} station${res.skipped.length > 1 ? 's don\'t' : ' doesn\'t'} fit in any allowed trip and ${res.skipped.length > 1 ? 'are' : 'is'} left out. Allow longer trips to include ${res.skipped.length > 1 ? 'them' : 'it'}.`);
+    const initial = update ? project.trips.map((t) => t.stops.filter((id) => !done[id])).filter((t) => t.length) : null;
+    const res = await planProject(cand, initial, ({ progress, K }) => { btn.textContent = `Planning… trying ${K} trip${K > 1 ? 's' : ''}, ${Math.round(progress * 100)}%`; });
+    if (!res.trips.length) throw new Error('No plan fits these limits. Allow longer or more trips.');
+    if (res.skipped.length) say(`${res.skipped.length} station${res.skipped.length > 1 ? 's' : ''} can't fit in any allowed trip.`);
     active = null; store('si-active', null);
     await saveProject({ settings: structuredClone(settings), trips: res.trips, doneAtMake: stations.filter((s) => done[s.id]).map((s) => s.id), made: Date.now() });
     show({ kind: 'project' });
@@ -888,7 +968,7 @@ if (live) {
   }, () => { $('count').textContent = 'Could not load the done list'; });
 }
 
-// ---------- Station pop-up ----------
+// ---------- Opening a station ----------
 // Keeps a point clear of the top bar and the bottom panel.
 function padding() {
   const sheet = $('sheet').hidden ? 0 : $('sheet').offsetHeight;
@@ -899,40 +979,18 @@ function padding() {
 // Centres a point in the clear part of the map. An offset, unlike padding, doesn't stay on the map afterwards.
 function focus(s, zoom) {
   const pad = padding();
-  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2 + 60] });
-}
-
-const popup = new maplibregl.Popup({ closeOnClick: false, offset: 14, maxWidth: '280px', focusAfterOpen: false });
-popup.on('close', () => { if (popId) { popId = null; refresh(); } });
-
-function renderPop() {
-  const s = byId[popId]; if (!s) return;
-  const d = done[s.id], plan = currentRoute(), k = plan ? plan.stops.indexOf(s.id) : -1;
-  let where = '';
-  if (k >= 0) where = `Stop ${k + 1} of ${plan.stops.length} on ${plan.fromProject ? `this ${KINDS[plan.kind].name.toLowerCase()} trip` : 'this quick trip'}`;
-  else if (project?.trips) { const i = project.trips.findIndex((t) => t.stops.includes(s.id)); if (i >= 0) where = `In ${KINDS[project.trips[i].kind].name.toLowerCase()} trip ${tripNumber(i)} of the plan`; }
-  const when = pending.has(s.id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
-  const el = document.createElement('div');
-  el.className = 'pop';
-  el.innerHTML = `<h4>${esc(s.name)}</h4><div class="meta">Station ${esc(s.num)} · ${s.docks} docks</div>
-    ${where ? `<div class="note" style="margin:0 0 4px">${where}</div>` : ''}
-    ${away?.id === s.id ? `<div class="away" style="margin-bottom:4px">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
-    <button class="big ${d ? 'undo' : ''}">${d ? 'Undo' : 'Mark as done'}</button>${when ? `<div class="note">${when}</div>` : ''}`;
-  el.querySelector('button').onclick = () => toggle(s);
-  popup.setDOMContent(el);
+  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2] });
 }
 
 function openStation(id, fly) {
-  popId = id;
+  const back = view?.kind === 'station' ? view.back : view;
+  show({ kind: 'station', id, back });
   const s = byId[id];
-  renderPop();
-  popup.setLngLat([s.lng, s.lat]).addTo(map);
-  refresh();
   if (fly) return focus(s, Math.max(map.getZoom(), 15.5));
   const pt = map.project([s.lng, s.lat]), pad = padding();
-  if (pt.y > innerHeight - pad.bottom || pt.y < pad.top + 150 || pt.x < pad.left) focus(s);
+  if (pt.y > innerHeight - pad.bottom || pt.y < pad.top || pt.x < pad.left) focus(s);
 }
-function closePop() { if (popId) popup.remove(); }
+const closeStation = () => { if (view?.kind === 'station') $('close').onclick(); };
 
 // Taps count when they land near a dot, not only on it; the closest dot wins.
 map.on('click', (e) => {
@@ -949,7 +1007,7 @@ map.on('click', (e) => {
     return finishPicking({ kind: 'spot', lat: e.lngLat.lat, lng: e.lngLat.lng, label: 'Spot on the map' });
   }
   if (best) openStation(best.id);
-  else closePop();
+  else closeStation();
 });
 map.on('mousemove', (e) => {
   if (!map.getLayer('st')) return;
