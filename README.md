@@ -12,7 +12,7 @@ One document per station in the `stations` collection, keyed by station id: `don
 
 ## Embedding in Tally
 
-Type `/embed`, choose Embed anything, and paste https://sharedmobilityalex.github.io/stationinspect/
+Type `/embed`, choose Embed anything, and paste the full address including `https://` (Tally does not add it): https://sharedmobilityalex.github.io/stationinspect/
 
 ## Notes
 
