@@ -130,6 +130,8 @@ const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStor
 let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
 let view = null;            // what the sheet shows: { kind: 'station', id } | { kind: 'planner' } | { kind: 'route' }
 let away = null, meMarker, plan = store('si-plan');
+// Routes saved before the start/end places were renamed.
+if (plan) for (const p of [plan.start, plan.end]) p.label = { 'Witter Field': 'BCD', 'Cleveland Park': 'DC' }[p.label] ?? p.label;
 const live = !!FIREBASE.apiKey;
 let col;
 if (live) {
@@ -244,7 +246,7 @@ let picked = store('si-picked') || { start: null, end: null };   // points chose
 const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
 
 function placeOptions(which) {
-  const opts = [['wf', 'Witter Field'], ['cp', 'Cleveland Park (Metro)'], ['me', 'My location'], ['pick', 'Choose on map…']];
+  const opts = [['wf', 'BCD'], ['cp', 'DC'], ['me', 'My location'], ['pick', 'Choose on map…']];
   if (which === 'end') opts.unshift(['same', 'Same as start']);
   const p = picked[which];
   if (p) opts.splice(opts.length - 1, 0, ['picked', p.label]);
@@ -353,8 +355,8 @@ function pace(mode) {
 function place(which) {
   const v = which === 'end' && form.end === 'same' ? form.start : form[which];
   const src = which === 'end' && form.end === 'same' ? 'start' : which;
-  if (v === 'wf') return Promise.resolve({ kind: 'station', id: WITTER, lat: byId[WITTER].lat, lng: byId[WITTER].lng, label: 'Witter Field' });
-  if (v === 'cp') { const a = routes.anchors[0]; return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: a.name }); }
+  if (v === 'wf') return Promise.resolve({ kind: 'station', id: WITTER, lat: byId[WITTER].lat, lng: byId[WITTER].lng, label: 'BCD' });
+  if (v === 'cp') { const a = routes.anchors[0]; return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: 'DC' }); }
   if (v === 'picked' && picked[src]) return Promise.resolve(picked[src]);
   return getLocation().then((me) => ({ kind: 'spot', lat: me.lat, lng: me.lng, label: 'Your location' }));
 }

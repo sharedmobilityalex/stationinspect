@@ -4,7 +4,7 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 
 - `index.html` is the page. `FIREBASE` near the top of its script holds the project's web settings, which are public by design.
 - `stations.json` is the station list (id, number, name, docks, location).
-- `routes.json` holds travel minutes between every pair of stations and Cleveland Park Metro, for driving, biking and walking (OSRM, OpenStreetMap). Rebuild it when stations change.
+- `routes.json` holds travel minutes between every pair of stations and DC (Cleveland Park Metro), for driving, biking and walking (OSRM, OpenStreetMap). Rebuild it when stations change.
 - `firestore.rules` are the database rules. Paste them in the Firebase console under Firestore Database, Rules, and publish. They allow anyone to mark or unmark a station, but not to delete records, add other fields or set the time.
 
 ## Finding a station
@@ -18,7 +18,7 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 
 The route button (top right) plans a trip through stations not yet done.
 
-- Start and End: Witter Field, Cleveland Park Metro, your location, or a station or spot tapped on the map. End can be the same as the start.
+- Start and End: BCD (Witter Field station), DC (Cleveland Park Metro), your location, or a station or spot tapped on the map. End can be the same as the start.
 - Drive, Bike or Walk, and how much to do today: everything left, a number of stations, or a time budget, with minutes spent at each stop.
 - It picks a compact group of stations that fits, orders them for the shortest trip, numbers them on the map, and lists arrival times. "Next stop" walks through them in order.
 - Times between stations come from `routes.json`. Times to a tapped spot or your location are fetched live; if the routing service doesn't answer within 15 seconds, the plan uses an estimate and says so.
