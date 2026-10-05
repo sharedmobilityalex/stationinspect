@@ -119,6 +119,9 @@ const FIREBASE = {
   appId: '1:384507805166:web:03350af9d39be4577fe2ff',
 };
 const WITTER = '2064975968599672936';
+// Day colours: far apart in hue and lightness so neighbouring days stay distinct; numbers on the dots back them up.
+const DAY_COLORS = ['#2563eb', '#ea580c', '#7c3aed', '#0d9488', '#db2777', '#92400e', '#65a30d', '#334155', '#ca8a04', '#0891b2'];
+const dayColor = (i) => DAY_COLORS[i % DAY_COLORS.length];
 // Live travel times for a spot that isn't in routes.json. The main OSRM server answers driving fastest.
 const OSRM = { drive: 'https://router.project-osrm.org', bike: 'https://routing.openstreetmap.de/routed-bike', walk: 'https://routing.openstreetmap.de/routed-foot' };
 const embedded = window.self !== window.top;
@@ -129,9 +132,9 @@ const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStor
 
 let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
 let view = null;            // what the sheet shows: { kind: 'station', id } | { kind: 'planner' } | { kind: 'route' }
-let away = null, meMarker, plan = store('si-plan');
+let away = null, meMarker, plan = store('si-plan'), campaign = store('si-days');
 // Routes saved before the start/end places were renamed.
-if (plan) for (const p of [plan.start, plan.end]) p.label = { 'Witter Field': 'BCD', 'Cleveland Park': 'DC' }[p.label] ?? p.label;
+for (const r of [plan, campaign]) if (r) for (const p of [r.start, r.end]) p.label = { 'Witter Field': 'BCD', 'Cleveland Park': 'DC' }[p.label] ?? p.label;
 const live = !!FIREBASE.apiKey;
 let col;
 if (live) {
@@ -154,36 +157,43 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom
 if (embedded) $('full').hidden = false;
 
 // ---------- Map layers ----------
+// Each dot carries the number to show (stop order, or day in the all-days view), a colour and whether it fades.
+const showingDays = () => view?.kind === 'days' && campaign;
 function stationData() {
-  const order = plan ? Object.fromEntries(plan.stops.map((id, i) => [id, i + 1])) : {};
+  const lbl = {}, col = {};
+  if (showingDays()) campaign.days.forEach((d, i) => d.stops.forEach((id) => { lbl[id] = i + 1; col[id] = dayColor(i); }));
+  else if (plan) plan.stops.forEach((id, i) => { lbl[id] = i + 1; });
+  const focused = showingDays() || plan;
   return { type: 'FeatureCollection', features: stations.map((s) => ({
     type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-    properties: { id: s.id, name: s.name, done: !!done[s.id], n: order[s.id] || 0, sel: view?.kind === 'station' && view.id === s.id } })) };
+    properties: { id: s.id, name: s.name, done: !!done[s.id], lbl: lbl[s.id] || 0, col: col[s.id] || '',
+                  dim: !!focused && !lbl[s.id], sel: view?.kind === 'station' && view.id === s.id } })) };
 }
 
 function routeData() {
-  if (!plan) return { type: 'FeatureCollection', features: [] };
-  const pts = [plan.start, ...plan.stops.map((id) => byId[id]), plan.end].map((p) => [p.lng, p.lat]);
-  return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} }] };
+  const line = (r, color) => ({ type: 'Feature', properties: { col: color },
+    geometry: { type: 'LineString', coordinates: [r.start, ...r.stops.map((id) => byId[id]), r.end].map((p) => [p.lng, p.lat]) } });
+  if (showingDays()) return { type: 'FeatureCollection', features: campaign.days.map((d, i) => line({ ...campaign, stops: d.stops }, dayColor(i))) };
+  return { type: 'FeatureCollection', features: plan ? [line(plan, '#2563eb')] : [] };
 }
 
 function addLayers() {
   map.addSource('route', { type: 'geojson', data: routeData() });
   map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': '#2563eb', 'line-width': 3, 'line-opacity': .7, 'line-dasharray': [2, 1.5] } });
+    paint: { 'line-color': ['get', 'col'], 'line-width': 3, 'line-opacity': .7, 'line-dasharray': [2, 1.5] } });
   map.addSource('st', { type: 'geojson', data: stationData() });
   // To do = filled red; done = white ring with a thick green edge, so the two differ by shape as well as colour.
   // With a route planned, stations off the route fade back and route stops grow to carry their number.
-  const r = ['interpolate', ['linear'], ['zoom'], 11, ['case', ['>', ['get', 'n'], 0], 9, 5], 16, ['case', ['>', ['get', 'n'], 0], 13, 10]];
+  const r = ['interpolate', ['linear'], ['zoom'], 11, ['case', ['>', ['get', 'lbl'], 0], 9, 5], 16, ['case', ['>', ['get', 'lbl'], 0], 13, 10]];
   map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
     'circle-radius': r,
-    'circle-color': ['case', ['get', 'done'], '#ffffff', '#ef4444'],
+    'circle-color': ['case', ['get', 'done'], '#ffffff', ['!=', ['get', 'col'], ''], ['get', 'col'], '#ef4444'],
     'circle-stroke-color': ['case', ['get', 'sel'], '#2563eb', ['get', 'done'], '#16a34a', '#ffffff'],
     'circle-stroke-width': ['case', ['get', 'sel'], 4, ['get', 'done'], 3.5, 1.5],
-    'circle-opacity': ['case', ['all', ['to-boolean', ['global-state', 'planned']], ['==', ['get', 'n'], 0]], .35, 1],
-    'circle-stroke-opacity': ['case', ['all', ['to-boolean', ['global-state', 'planned']], ['==', ['get', 'n'], 0]], .35, 1] } });
-  map.addLayer({ id: 'st-n', type: 'symbol', source: 'st', filter: ['>', ['get', 'n'], 0], layout: {
-    'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true },
+    'circle-opacity': ['case', ['get', 'dim'], .35, 1],
+    'circle-stroke-opacity': ['case', ['get', 'dim'], .35, 1] } });
+  map.addLayer({ id: 'st-n', type: 'symbol', source: 'st', filter: ['>', ['get', 'lbl'], 0], layout: {
+    'text-field': ['to-string', ['get', 'lbl']], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true },
     paint: { 'text-color': ['case', ['get', 'done'], '#16a34a', '#ffffff'] } });
   // Names appear once zoomed in close enough to read them.
   map.addLayer({ id: 'st-name', type: 'symbol', source: 'st', minzoom: 15, layout: {
@@ -193,12 +203,11 @@ function addLayers() {
 
 function refresh() {
   if (map.getSource('st')) {
-    map.setGlobalStateProperty('planned', !!plan);
     map.getSource('st').setData(stationData());
     map.getSource('route').setData(routeData());
   }
   drawEnds();
-  $('routeBtn').classList.toggle('on', !!plan);
+  $('routeBtn').classList.toggle('on', !!(plan || campaign));
   if (!stations.length) return;
   const n = stations.filter((s) => done[s.id]).length;
   $('count').innerHTML = `${n} / ${stations.length} done <span class="lg"><span class="dot"></span>to do <span class="dot done"></span>done</span>`
@@ -217,6 +226,7 @@ function render() {
   if (view.kind === 'station') b.innerHTML = stationHTML(view.id);
   else if (view.kind === 'planner') b.innerHTML = plannerHTML();
   else if (view.kind === 'route') b.innerHTML = routeHTML();
+  else if (view.kind === 'days') b.innerHTML = daysHTML();
   wire(b);
 }
 
@@ -266,8 +276,12 @@ function plannerHTML() {
       ${form.limit === 'time' ? `<div><label class="f" for="fHours">Hours</label><input class="f" id="fHours" data-f="hours" type="number" min="0.5" max="12" step="0.5" inputmode="decimal" value="${form.hours}"></div>` : ''}
       <div><label class="f" for="fDwell">Minutes at each stop</label><input class="f" id="fDwell" data-f="dwell" type="number" min="0" max="60" inputmode="numeric" value="${form.dwell}"></div>
     </div>
-    <button class="big blue" data-act="plan">Plan route</button>
-    ${plan ? '<button class="big plain" data-act="showroute">Back to current route</button>' : ''}`;
+    <div class="row"><button class="big blue" data-act="plan">Plan today</button>${form.limit === 'all' ? ''
+      : '<button class="big plain" data-act="plandays">Plan all days</button>'}</div>
+    <div class="note">${form.limit === 'all' ? 'Set a number of stations or a time to split the work into days.'
+      : 'Both plan every station left, split into days that fit this limit. "Plan today" gives you the fullest of those days, so nothing gets stranded.'}</div>
+    ${plan ? '<button class="big plain" data-act="showroute">Back to current route</button>' : ''}
+    ${campaign ? '<button class="big plain" data-act="days">Back to all days</button>' : ''}`;
 }
 
 function routeHTML() {
@@ -278,14 +292,30 @@ function routeHTML() {
     return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
   }).join('');
   const nx = nextStop();
-  return `<h3>${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
+  return `<h3>${plan.day ? `Day ${plan.day} of ${plan.of} · ` : ''}${plan.stops.length} stops · about ${fmtMin(plan.total)}</h3>
     <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[plan.mode]} · ${fmtMin(plan.travel)} moving + ${plan.dwell} min per stop
       · ${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.estimated ? ' · times to your chosen spot are estimates' : ''}</div>
     ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>`
       : '<div class="note">Every stop on this route is done.</div>'}
     <ol class="stops">${rows}</ol>
-    <div class="row"><button class="big plain" data-act="planner">Change</button><button class="big plain" data-act="clear">Clear route</button></div>
+    <div class="row"><button class="big plain" data-act="planner">Change</button>${campaign ? '<button class="big plain" data-act="days">All days</button>' : ''}<button class="big plain" data-act="clear">Clear route</button></div>
     <div class="note">The dashed line shows the order of stops, not the streets to take.</div>`;
+}
+
+function daysHTML() {
+  const c = campaign, all = c.days.flatMap((d) => d.stops), left = all.filter((id) => !done[id]).length;
+  const rows = c.days.map((d, i) => {
+    const n = d.stops.filter((id) => done[id]).length;
+    return `<li data-day="${i}"><span class="n" style="background:${dayColor(i)}">${i + 1}</span>
+      <span class="nm">${d.stops.length} stops · ${fmtMin(d.total)}${n ? ` · ${n} done` : ''}<br><small style="color:var(--muted)">${esc(byId[d.stops[0]].name)} → ${esc(byId[d.stops[d.stops.length - 1]].name)}</small></span>
+      <span class="t">${i === 0 ? 'fullest' : ''}</span></li>`;
+  }).join('');
+  return `<h3>${c.days.length} days · about ${fmtMin(c.days.reduce((t, d) => t + d.total, 0))} in all</h3>
+    <div class="meta">${{ drive: 'Driving', bike: 'Biking', walk: 'Walking' }[c.mode]} · ${c.limitText} a day · ${c.dwell} min per stop · ${esc(c.start.label)} → ${esc(c.end.label)}</div>
+    ${c.skipped ? `<div class="note">${c.skipped} station${c.skipped > 1 ? 's are' : ' is'} too far to fit in one day at this limit and ${c.skipped > 1 ? 'are' : 'is'} left out.</div>` : ''}
+    <ol class="stops">${rows}</ol>
+    <div class="note">Tap a day to make it today's route. ${left < all.length ? 'Some stations are done since this plan was made; plan again to fold the rest into fewer days.' : 'Finished stations drop out each time you plan again.'}</div>
+    <div class="row"><button class="big plain" data-act="planner">Change</button><button class="big plain" data-act="cleardays">Clear plan</button></div>`;
 }
 
 function wire(b) {
@@ -297,7 +327,8 @@ function wire(b) {
     form[k] = el.tagName === 'INPUT' ? Number(el.value) : el.value;
     store('si-form', form);
   });
-  b.querySelectorAll('ol.stops li').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
+  b.querySelectorAll('ol.stops li[data-id]').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
+  b.querySelectorAll('ol.stops li[data-day]').forEach((el) => el.onclick = () => loadDay(Number(el.dataset.day)));
 }
 
 function act(a, id) {
@@ -306,10 +337,22 @@ function act(a, id) {
   else if (a === 'planner') show({ kind: 'planner' });
   else if (a === 'showroute') show({ kind: 'route' });
   else if (a === 'clear') { plan = null; store('si-plan', null); hideSheet(); }
-  else if (a === 'plan') makePlan();
+  else if (a === 'plan') makePlan('today');
+  else if (a === 'plandays') makePlan('days');
+  else if (a === 'days') { show({ kind: 'days' }); fitAll(campaign.days.flatMap((d) => d.stops), campaign); }
+  else if (a === 'cleardays') { campaign = null; store('si-days', null); show({ kind: plan ? 'route' : 'planner' }); }
 }
 
-$('routeBtn').onclick = () => show({ kind: plan ? 'route' : 'planner' });
+$('routeBtn').onclick = () => show({ kind: plan ? 'route' : campaign ? 'days' : 'planner' });
+
+function loadDay(i) {
+  const d = campaign.days[i];
+  plan = { ...d, mode: campaign.mode, dwell: campaign.dwell, start: campaign.start, end: campaign.end, estimated: campaign.estimated,
+           day: i + 1, of: campaign.days.length, made: Date.now() };
+  store('si-plan', plan);
+  show({ kind: 'route' });
+  fitPlan();
+}
 
 // Choosing a start or end on the map: tap a station dot or any spot.
 let picking = null;
@@ -415,8 +458,80 @@ function solve(cand, T, s, e, limit, dwell) {
   return r;
 }
 
-async function makePlan() {
-  const btn = $('body').querySelector('[data-act="plan"]');
+// Splits stations into day trips that each fit the daily limit, all from the same start to the same end.
+// Clarke–Wright savings builds compact loops; then the smallest days are dissolved into the others where
+// they fit, and single stations move between days whenever that shortens the total. Returns ordered days.
+function planDays(cand, T, s, e, limit, dwell) {
+  const travel = (r) => { let c = 0, prev = s; for (const x of r) { c += T(prev, x); prev = x; } return c + T(prev, e); };
+  const fits = (r) => (!limit.count || r.length <= limit.count) && (!limit.minutes || travel(r) + r.length * dwell <= limit.minutes);
+  const tidy = (r) => solve(r, T, s, e, {}, dwell);
+  if (!limit.count && !limit.minutes) return cand.length ? [tidy(cand)] : [];
+  const reachable = cand.filter((x) => fits([x]));
+  // Savings: joining the day that ends at i to the day that starts at j skips one trip back and out.
+  let days = reachable.map((x) => [x]);
+  const dayOf = new Map(days.map((d) => [d[0], d]));
+  const sav = [];
+  for (const i of reachable) for (const j of reachable) if (i !== j) sav.push([T(i, e) + T(s, j) - T(i, j), i, j]);
+  sav.sort((x, y) => y[0] - x[0]);
+  for (const [, i, j] of sav) {
+    const a = dayOf.get(i), b = dayOf.get(j);
+    if (a === b || a[a.length - 1] !== i || b[0] !== j) continue;
+    const m = [...a, ...b];
+    if (!fits(m)) continue;
+    m.forEach((x) => dayOf.set(x, m));
+    days = days.filter((d) => d !== a && d !== b);
+    days.push(m);
+  }
+  days = days.map(tidy);
+  // Cheapest feasible place for x in day d, or null.
+  const slot = (d, x) => {
+    let best = null;
+    for (let k = 0; k <= d.length; k++) {
+      const t = [...d.slice(0, k), x, ...d.slice(k)];
+      if (!fits(t)) continue;
+      const c = travel(t);
+      if (!best || c < best.c) best = { t, c };
+    }
+    return best;
+  };
+  // Dissolve small days into the others.
+  for (let tries = 0; tries < days.length; tries++) {
+    days.sort((x, y) => x.length - y.length);
+    let merged = false;
+    for (const small of days) {
+      let others = days.filter((d) => d !== small).map((d) => d.slice()), ok = true;
+      for (const x of small) {
+        let best = null, bi = -1;
+        others.forEach((d, i) => { const sl = slot(d, x); if (sl && (!best || sl.c - travel(d) < best.c - travel(others[bi]))) { best = sl; bi = i; } });
+        if (!best) { ok = false; break; }
+        others[bi] = tidy(best.t);
+      }
+      if (ok) { days = others; merged = true; break; }
+    }
+    if (!merged) break;
+  }
+  // Move single stations between days when it shortens the total.
+  for (let pass = 0, moved = true; moved && pass < 6; pass++) {
+    moved = false;
+    for (let ai = 0; ai < days.length; ai++) for (const x of days[ai].slice()) {
+      const A = days[ai], rest = A.filter((y) => y !== x), gainA = travel(A) - travel(rest);
+      for (let bi = 0; bi < days.length; bi++) {
+        if (bi === ai || !rest.length) continue;
+        const sl = slot(days[bi], x);
+        if (sl && sl.c - travel(days[bi]) < gainA - 1e-9) {
+          days[ai] = tidy(rest); days[bi] = tidy(sl.t); moved = true; break;
+        }
+      }
+    }
+  }
+  // Day 1 is the day closest to the start, so "today" works outward from where you are.
+  const near = (d) => d.reduce((t, x) => t + T(s, x), 0) / d.length;
+  return days.filter((d) => d.length).sort((x, y) => near(x) - near(y));
+}
+
+async function makePlan(kind) {
+  const btn = $('body').querySelector(`[data-act="${kind === 'days' ? 'plandays' : 'plan'}"]`);
+  const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = form.mode !== 'drive' && [form.start, form.end].some((v) => v === 'me' || (v === 'picked' && picked.start?.kind === 'spot') || (v === 'picked' && picked.end?.kind === 'spot'))
     ? 'Planning… (bike and walk times to a spot take up to 15 s)' : 'Planning…';
@@ -437,35 +552,45 @@ async function makePlan() {
     };
     const cand = stations.filter((st) => !done[st.id]).map((st) => routes.ids.indexOf(st.id));
     const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : form.limit === 'time' ? { minutes: form.hours * 60 } : {};
-    const order = solve(cand, T, S, E, limit, dwell);
-    if (!order.length) throw new Error(cand.length ? 'Not enough time for even one stop. Try more time.' : 'Every station is already done.');
-    const path = [S, ...order, E], legs = [];
-    for (let i = 1; i < path.length; i++) legs.push(T(path[i - 1], path[i]));
-    const travel = legs.reduce((a, b) => a + b, 0);
-    plan = { mode, dwell, start: ps, end: pe, stops: order.map((i) => routes.ids[i]), legs, travel,
-             total: travel + order.length * dwell, estimated: ls.estimated || le.estimated, made: Date.now() };
-    store('si-plan', plan);
-    show({ kind: 'route' });
-    fitPlan();
+    if (!cand.length) throw new Error('Every station is already done.');
+    const days = planDays(cand, T, S, E, limit, dwell);
+    if (!days.length) throw new Error('Not enough time for even one stop. Try more time.');
+    const sum = (order) => {
+      const path = [S, ...order, E], legs = [];
+      for (let i = 1; i < path.length; i++) legs.push(T(path[i - 1], path[i]));
+      const travel = legs.reduce((a, b) => a + b, 0);
+      return { stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell };
+    };
+    // The fullest day goes first: it is what "Plan today" hands you. The rest stay nearest-first.
+    const full = days.reduce((bi, d, i) => (d.length > days[bi].length ? i : bi), 0);
+    const ordered = [days[full], ...days.filter((_, i) => i !== full)];
+    campaign = { mode, dwell, start: ps, end: pe, estimated: ls.estimated || le.estimated, made: Date.now(),
+                 limitText: limit.count ? `${limit.count} stations` : limit.minutes ? fmtMin(limit.minutes) : 'everything',
+                 skipped: cand.length - days.flat().length, days: ordered.map(sum) };
+    store('si-days', campaign);
+    if (kind === 'days') { show({ kind: 'days' }); fitAll(campaign.days.flatMap((d) => d.stops), campaign); }
+    else loadDay(0);
   } catch (err) {
-    btn.disabled = false; btn.textContent = 'Plan route';
+    btn.disabled = false; btn.textContent = label;
     say(esc(err.message === 'location' ? 'Could not get your location for the route. Pick a place on the map instead.' : err.message));
   }
 }
 
-function fitPlan() {
+function fitAll(ids, ends) {
   const b = new maplibregl.LngLatBounds();
-  [plan.start, plan.end, ...plan.stops.map((id) => byId[id])].forEach((p) => b.extend([p.lng, p.lat]));
+  [ends.start, ends.end, ...ids.map((id) => byId[id])].forEach((p) => b.extend([p.lng, p.lat]));
   map.fitBounds(b, { padding: padding(), maxZoom: 16 });
 }
+const fitPlan = () => fitAll(plan.stops, plan);
 
 // Start/end flags.
 const ends = {};
 function drawEnds() {
   for (const k of ['start', 'end']) {
-    const p = plan?.[k];
+    const src = showingDays() ? campaign : plan;
+    const p = src?.[k];
     if (!p) { ends[k]?.remove(); continue; }
-    const same = plan.start.lat === plan.end.lat && plan.start.lng === plan.end.lng;
+    const same = src.start.lat === src.end.lat && src.start.lng === src.end.lng;
     if (k === 'end' && same) { ends[k]?.remove(); continue; }
     ends[k] ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'end' }), anchor: 'bottom', offset: [0, -12] });
     ends[k].getElement().textContent = same ? 'Start · End' : k === 'start' ? 'Start' : 'End';
@@ -641,6 +766,7 @@ const stationsLoaded = fetch('stations.json').then((r) => r.json()).then((list) 
   stations = list;
   byId = Object.fromEntries(list.map((s) => [s.id, s]));
   if (plan && !plan.stops.every((id) => byId[id])) { plan = null; store('si-plan', null); }
+  if (campaign && !campaign.days.every((d) => d.stops.every((id) => byId[id]))) { campaign = null; store('si-days', null); }
   refresh();
   if ($q.value) search();
   return list;

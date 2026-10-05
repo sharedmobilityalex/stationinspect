@@ -16,13 +16,14 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 
 ## Planning a route
 
-The route button (top right) plans a trip through stations not yet done.
+The route button (top right) plans trips through the stations not yet done.
 
 - Start and End: BCD (Witter Field station), DC (Cleveland Park Metro), your location, or a station or spot tapped on the map. End can be the same as the start.
-- Drive, Bike or Walk, and how much to do today: everything left, a number of stations, or a time budget, with minutes spent at each stop.
-- It picks a compact group of stations that fits, orders them for the shortest trip, numbers them on the map, and lists arrival times. "Next stop" walks through them in order.
+- Drive, Bike or Walk, and the daily limit: a number of stations or a time, plus minutes spent at each stop. "All left" plans one trip through everything.
+- **Plan all days** splits every station left into compact day trips that each fit the limit (savings-based grouping, then small days folded into others and stations moved between days wherever that shortens the total). Days are coloured and numbered on the map; tap one to make it today's route.
+- **Plan today** builds the same full plan and hands you its fullest day, so today's route never strands scattered stations. Finished stations drop out each time you plan again, so the plan adapts as work gets done.
 - Times between stations come from `routes.json`. Times to a tapped spot or your location are fetched live; if the routing service doesn't answer within 15 seconds, the plan uses an estimate and says so.
-- The plan is kept on the device until cleared. Re-plan any time; finished stations are left out.
+- Plans are kept on the device until cleared.
 
 ## Data
 
