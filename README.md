@@ -11,7 +11,6 @@ A map of Alexandria's Capital Bikeshare stations, made to be embedded in a Tally
 - The search box matches station names and numbers as you type ("mt vernon", "king metro", "31908"). Arrow keys and Enter work, or tap a result.
 - The target button finds the station nearest the device and shows the distance. Inside an embed, the browser may block location; the map then offers a link to open it on its own page, where location works.
 
-- Inside an embed, the button at the top right opens the map on its own page, which fills a phone screen. In the embed, move the map with two fingers so one finger still scrolls the form.
 
 ## Data
 

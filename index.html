@@ -13,7 +13,7 @@
   .card { background: var(--bg); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
   [hidden] { display: none !important; }
 
-  /* Top bar: search + locate, full screen */
+  /* Top bar: search + locate */
   #top { position: absolute; top: 10px; left: 10px; right: 10px; max-width: 380px; z-index: 2; }
   #bar { display: flex; gap: 6px; }
   #search { display: flex; flex: 1; min-width: 0; }
@@ -66,11 +66,6 @@
         </svg>
       </button>
     </div>
-    <a id="full" class="card icon" href="./" target="_blank" rel="noopener" title="Open full screen" aria-label="Open the map full screen" hidden>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
-      </svg>
-    </a>
   </div>
   <ul id="results" class="card" role="listbox" hidden></ul>
   <div id="msg" class="card" role="status" hidden></div>
@@ -116,7 +111,6 @@ const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenSt
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: CREDITS }), 'bottom-right');
 document.querySelector('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-if (embedded) $('full').hidden = false;
 
 // ---------- Map ----------
 function stationData() {
