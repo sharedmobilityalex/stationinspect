@@ -13,7 +13,7 @@
   .card { background: var(--bg); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
   [hidden] { display: none !important; }
 
-  /* Top bar: search + locate, route, full screen */
+  /* Top bar: search + locate, full screen */
   #top { position: absolute; top: 10px; left: 10px; right: 10px; max-width: 380px; z-index: 2; }
   #bar { display: flex; gap: 6px; }
   #search { display: flex; flex: 1; min-width: 0; }
@@ -23,7 +23,6 @@
           display: grid; place-items: center; padding: 0; }
   #locate { border-left: 1px solid var(--line); border-radius: 0 8px 8px 0; }
   #locate:disabled { color: var(--muted); cursor: wait; }
-  #routeBtn.on { background: var(--blue); color: #fff; }
   #results { list-style: none; margin: 6px 0 0; padding: 4px 0; max-height: 50vh; overflow-y: auto; }
   #results li { padding: 9px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
   #results li[aria-selected="true"], #results li:hover { background: #eff6ff; }
@@ -36,7 +35,7 @@
   #msg { margin-top: 6px; padding: 8px 10px; }
   #msg a { color: var(--blue); }
 
-  /* Bottom sheet: station details, route planner, route list */
+  /* Bottom panel: station details */
   #sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; max-height: 62%; overflow-y: auto;
            border-radius: 12px 12px 0 0; padding: 14px 16px 16px; box-shadow: 0 -2px 10px rgba(0,0,0,.2); background: var(--bg); }
   @media (min-width: 640px) { #sheet { left: 10px; right: auto; bottom: 10px; width: 360px; border-radius: 12px; } }
@@ -49,46 +48,9 @@
   .big { display: block; width: 100%; padding: 12px; border: 0; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer;
          background: var(--done); color: #fff; margin-top: 8px; }
   .big.undo { background: var(--line); color: var(--ink); }
-  .big.blue { background: var(--blue); }
-  .big.plain { background: none; color: var(--blue); border: 1px solid var(--line); }
-  .row { display: flex; gap: 8px; }
-  .row > * { flex: 1; }
-  label.f { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 4px; }
-  select.f, input.f { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 16px; }
-  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .seg button { flex: 1; padding: 10px 0; border: 0; background: #fff; cursor: pointer; }
-  .seg button + button { border-left: 1px solid var(--line); }
-  .seg button[aria-pressed="true"] { background: var(--blue); color: #fff; font-weight: 600; }
-  ol.stops { margin: 8px 0 0; padding: 0; list-style: none; }
-  ol.stops li { display: flex; gap: 10px; align-items: center; padding: 8px 2px; border-top: 1px solid var(--line); cursor: pointer; }
-  ol.stops .n { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--todo); color: #fff; font-size: 12px; font-weight: 700;
                 display: grid; place-items: center; }
-  ol.stops li.done .n { background: #fff; color: var(--done); border: 2px solid var(--done); box-sizing: border-box; }
-  ol.stops li.done .nm { color: var(--muted); text-decoration: line-through; }
-  ol.stops .t { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
   .me { width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 0 0 8px rgba(37,99,235,.15); }
-  .end { padding: 2px 6px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
-  #eyeBtn[aria-pressed="false"] { color: var(--muted); }
-  .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; vertical-align: 1px; }
-  .chk { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
-  .chk label { flex: 1; display: flex; gap: 8px; align-items: center; font-weight: 600; }
-  .chk input[type=checkbox] { width: 20px; height: 20px; }
-  .chk input[type=number] { width: 56px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
-  .chk small { color: var(--muted); font-weight: 400; }
-  .krow { display: grid; grid-template-columns: 1fr 68px 68px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
-  .krow.head { border-top: 0; padding: 0; font-size: 12px; color: var(--muted); }
-  .krow.head span { text-align: center; }
-  .krow label { display: flex; gap: 10px; align-items: center; font-weight: 600; }
-  .krow label small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
-  .krow input[type=checkbox] { width: 20px; height: 20px; flex: none; }
-  .krow input[type=number] { width: 100%; box-sizing: border-box; padding: 9px 6px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; text-align: center; }
-  .tabs { display: flex; gap: 6px; margin: 2px 0 10px; }
-  .tabs button { flex: 1; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 600; }
-  .tabs button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  #picking { position: absolute; left: 10px; right: 10px; top: 104px; max-width: 360px; z-index: 3; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
-  #picking span { flex: 1; }
-  #picking button { border: 0; background: none; color: var(--blue); font-weight: 600; cursor: pointer; padding: 8px; }
 </style>
 </head>
 <body>
@@ -104,16 +66,6 @@
         </svg>
       </button>
     </div>
-    <button id="routeBtn" class="card icon" type="button" title="Plan a route" aria-label="Plan a route">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>
-      </svg>
-    </button>
-    <button id="eyeBtn" class="card icon" type="button" title="Show or hide the planned route" aria-label="Show planned route" aria-pressed="true" hidden>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M3 3l18 18" style="display:none"/>
-      </svg>
-    </button>
     <a id="full" class="card icon" href="./" target="_blank" rel="noopener" title="Open full screen" aria-label="Open the map full screen" hidden>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>
@@ -125,7 +77,6 @@
   <div id="count" class="card">Loading…</div>
 </div>
 <div id="sheet" role="dialog" aria-live="polite" hidden><button id="close" type="button" aria-label="Close">×</button><div id="body"></div></div>
-<div id="picking" class="card" hidden><span></span><button type="button">Cancel</button></div>
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -140,32 +91,18 @@ const FIREBASE = {
   projectId: 'stationinspect-3d591',
   appId: '1:384507805166:web:03350af9d39be4577fe2ff',
 };
-const WITTER = '2064975968599672936';
-// Day colours: far apart in hue and lightness so neighbouring days stay distinct; numbers on the dots back them up.
-const DAY_COLORS = ['#2563eb', '#ea580c', '#7c3aed', '#0d9488', '#db2777', '#92400e', '#65a30d', '#334155', '#ca8a04', '#0891b2'];
-const dayColor = (i) => DAY_COLORS[i % DAY_COLORS.length];
-// Live travel times for a spot that isn't in routes.json. The main OSRM server answers driving fastest.
-const OSRM = { drive: 'https://router.project-osrm.org', bike: 'https://routing.openstreetmap.de/routed-bike' };
 const embedded = window.self !== window.top;
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch {} return null; };
 
-let stations = [], byId = {}, done = {}, pending = new Set(), routes = null;
-let view = null;            // what the panel shows: { kind: 'project' | 'setup' | 'route' | 'quick' }
-let away = null, meMarker;
-let quick = store('si-plan');                 // a quick trip planned on this device
-let active = store('si-active');              // { made, i }: the project trip in use on this device
-let showRoute = store('si-show') ?? true;     // route lines and numbers on the map
-let project = null, projectLocal = store('si-project'), projectRemote = false;
+let stations = [], byId = {}, done = {}, pending = new Set(), openId = null, away = null, meMarker;
 const live = !!FIREBASE.apiKey;
-let col, planDoc;
+let col;
 if (live) {
   // The local cache keeps taps made with no signal and sends them when the connection returns.
   const db = initializeFirestore(initializeApp(FIREBASE), { localCache: persistentLocalCache() });
   col = collection(db, 'stations');
-  planDoc = doc(db, 'plans', 'project');
 }
 
 // Inside an embed one finger scrolls the form, two move the map; the full page uses one finger.
@@ -175,308 +112,27 @@ const map = new maplibregl.Map({
 });
 // The credits start folded into their (i) button; a tap opens them. Bottom corners stack upward,
 // so adding the credits before the zoom buttons keeps (i) underneath.
-const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openmaptiles.org/">OpenMapTiles</a> · <a href="https://openfreemap.org">OpenFreeMap</a> · Routing: <a href="https://project-osrm.org">OSRM</a>';
+const CREDITS = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · <a href="https://www.openmaptiles.org/">OpenMapTiles</a> · <a href="https://openfreemap.org">OpenFreeMap</a>';
 map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: CREDITS }), 'bottom-right');
 document.querySelector('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 if (embedded) $('full').hidden = false;
 
-const fmtMin = (m) => { const r = Math.round(m); return r < 60 ? `${r} min` : `${Math.floor(r / 60)} h ${String(r % 60).padStart(2, '0')} min`; };
-const MODE = { drive: 'Drive', bike: 'Bike' };
-
-// ---------- Trip kinds ----------
-// Every project trip is one of these, driven or biked. Morning trips count only the time beyond the usual
-// commute; heading home to DC, the drive isn't counted, and by bike only the ride to the Metro is.
-// All day comes before Extended so that, when either would do, the trip is called All day.
-const KINDS = {
-  morning:   { name: 'Morning',   from: 'DC',  to: 'BCD', hours: 2, color: '#d97706', commuteIn: true },
-  afternoon: { name: 'Afternoon', from: 'BCD', to: 'DC',  hours: 4, color: '#2563eb', commuteOut: true },
-  allday:    { name: 'All day',   from: 'DC',  to: 'DC',  hours: 7, color: '#0d9488', max: 2 },
-  extended:  { name: 'Extended',  from: 'DC',  to: 'DC',  hours: 6, color: '#7c3aed' },
-};
-const defaultSettings = () => ({ kinds: Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [k, { on: true, hours: v.hours, max: v.max ?? null }])),
-                                 modes: { drive: true, bike: true }, dwell: 10 });
-let settings = store('si-settings') || defaultSettings();
-// Settings saved by earlier versions: drop getting-started minutes, add trip limits.
-delete settings.setup;
-for (const k of Object.keys(KINDS)) settings.kinds[k] ??= { on: true, hours: KINDS[k].hours, max: KINDS[k].max ?? null };
-
-const ix = (id) => routes.ids.indexOf(id);
-// Travel rules for one kind of trip by one mode, over matrix indices.
-function variant(kind, mode) {
-  const k = KINDS[kind], M = routes.min[mode], DC = ix('cp'), B = ix(WITTER);
-  const metros = routes.anchors.filter((a) => a.metro).map((a) => ix(a.id));
-  const n = stations.length;
-  const metroIn = [], metroOut = [];   // quickest Metro station to arrive at / leave from, per station
-  for (let x = 0; x < n; x++) {
-    metroIn[x] = metros.reduce((b, m) => (M[m][x] < M[b][x] ? m : b));
-    metroOut[x] = metros.reduce((b, m) => (M[x][m] < M[x][b] ? m : b));
-  }
-  const first = (x) => k.from === 'DC' ? (mode === 'drive' ? M[DC][x] : M[metroIn[x]][x]) : M[B][x];
-  const last = (x) => k.to === 'DC' ? (mode === 'drive' ? 0 : M[x][metroOut[x]]) : M[x][B];
-  let base = 0;   // what you'd have travelled anyway on a normal commute
-  if (k.commuteIn) base += mode === 'drive' ? M[DC][B] : Math.min(...metros.map((m) => M[m][B]));
-  if (k.commuteOut && mode === 'bike') base += Math.min(...metros.map((m) => M[B][m]));
-  const pt = (i) => { const id = routes.ids[i]; const a = byId[id] || routes.anchors.find((q) => q.id === id); return { id, lat: a.lat, lng: a.lng, name: a.name }; };
-  const start = (r) => k.from === 'DC' ? (mode === 'drive' ? { ...pt(DC), label: 'DC' } : { ...pt(metroIn[r[0]]), label: `${pt(metroIn[r[0]]).name} (Metro from DC)` }) : { ...pt(B), label: 'BCD' };
-  const end = (r) => k.to === 'DC'
-    ? (mode === 'drive' ? { ...pt(r[r.length - 1]), label: 'last stop', after: 'then drive home' }
-      : { ...pt(metroOut[r[r.length - 1]]), label: pt(metroOut[r[r.length - 1]]).name, after: 'then Metro home' })
-    : { ...pt(B), label: 'BCD' };
-  return { kind, mode, M, first, last, base, start, end };
-}
-
-// ---------- Project planner (runs in a background worker) ----------
-// Fewest trips first, then least counted time. For each trip count from the smallest possible, it starts
-// from compact geographic groups and runs a few thousand rounds of "pull out a handful of stations and put
-// them back where they fit best" (keeping a worse arrangement now and then, less often as it goes), with
-// 2-opt and or-opt ordering inside each trip. The first trip count with every trip inside its limit wins.
-function plannerWorker() {
-  self.onmessage = (ev) => {
-    const { M: MM, ids, anchors, coords, cand, cfg, bcd } = ev.data;
-    const ix = (id) => ids.indexOf(id), DC = ix('cp'), B = ix(bcd), n = coords.length, dwell = cfg.dwell;
-    const metros = anchors.filter((a) => a.metro).map((a) => ix(a.id));
-    const V = [];
-    for (const [kind, k] of cfg.kinds) for (const mode of cfg.modes) {
-      const M = MM[mode], F = new Float64Array(n), L = new Float64Array(n);
-      for (let x = 0; x < n; x++) {
-        const mIn = metros.reduce((b, m) => (M[m][x] < M[b][x] ? m : b)), mOut = metros.reduce((b, m) => (M[x][m] < M[x][b] ? m : b));
-        F[x] = k.from === 'DC' ? (mode === 'drive' ? M[DC][x] : M[mIn][x]) : M[B][x];
-        L[x] = k.to === 'DC' ? (mode === 'drive' ? 0 : M[x][mOut]) : M[x][B];
-      }
-      let base = 0;
-      if (k.commuteIn) base += mode === 'drive' ? M[DC][B] : Math.min(...metros.map((m) => M[m][B]));
-      if (k.commuteOut && mode === 'bike') base += Math.min(...metros.map((m) => M[B][m]));
-      V.push({ kind, mode, M, F, L, base, cap: k.hours * 60, max: k.max || Infinity });
-    }
-    let seed = 12345; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const travel = (v, r) => { if (!r.length) return 0; let c = v.F[r[0]]; for (let i = 1; i < r.length; i++) c += v.M[r[i - 1]][r[i]]; return c + v.L[r[r.length - 1]]; };
-    const dur = (t) => travel(t.v, t.r) + t.r.length * dwell;
-    const cost = (t) => t.r.length ? dur(t) - t.v.base : 0;
-    const over = (t) => Math.max(0, dur(t) - t.v.cap);
-    const PEN = 50, score = (S) => S.reduce((a, t) => a + cost(t) + PEN * over(t), 0);
-    const clone = (S) => S.map((t) => ({ v: t.v, r: t.r.slice() }));
-    function improve(t) {
-      const v = t.v, M = v.M, r = t.r, m = r.length;
-      if (m < 2) return;
-      const fw = new Float64Array(m), bw = new Float64Array(m);
-      const sums = () => { for (let k = 1; k < m; k++) { fw[k] = fw[k - 1] + M[r[k - 1]][r[k]]; bw[k] = bw[k - 1] + M[r[k]][r[k - 1]]; } };
-      const eIn = (p, x) => p === null ? v.F[x] : M[p][x], eOut = (x, q) => q === null ? v.L[x] : M[x][q];
-      const link = (p, q) => p === null ? (q === null ? 0 : v.F[q]) : (q === null ? v.L[p] : M[p][q]);
-      sums();
-      for (let better = true, guard = 0; better && guard < 300; guard++) {
-        better = false;
-        for (let i = 0; i < m - 1 && !better; i++) for (let j = i + 1; j < m; j++) {
-          const p = i ? r[i - 1] : null, q = j + 1 < m ? r[j + 1] : null;
-          if (eIn(p, r[j]) + (bw[j] - bw[i]) + eOut(r[i], q) < eIn(p, r[i]) + (fw[j] - fw[i]) + eOut(r[j], q) - 1e-9) {
-            const seg = r.slice(i, j + 1).reverse(); r.splice(i, j - i + 1, ...seg); sums(); better = true; break;
-          }
-        }
-        for (let len = 1; len <= 3 && !better; len++) for (let i = 0; i + len <= m && !better; i++) {
-          const a = i ? r[i - 1] : null, b = i + len < m ? r[i + len] : null, s0 = r[i], s1 = r[i + len - 1];
-          const gain = eIn(a, s0) + eOut(s1, b) - link(a, b);
-          for (let j = 0; j <= m; j++) {
-            if (j >= i && j <= i + len) continue;
-            const p = j ? r[j - 1] : null, q = j < m ? r[j] : null;
-            if (eIn(p, s0) + eOut(s1, q) - link(p, q) < gain - 1e-9) {
-              const seg = r.splice(i, len); r.splice(j > i ? j - len : j, 0, ...seg); sums(); better = true; break;
-            }
-          }
-        }
-      }
-    }
-    function pickVariant(t, S) {
-      const used = {}; for (const u of S) if (u !== t && u.r.length) used[u.v.kind] = (used[u.v.kind] || 0) + 1;
-      let best = null;
-      for (const v of V) {
-        if ((used[v.kind] || 0) >= v.max) continue;
-        const tt = { v, r: t.r.slice() }; improve(tt);
-        const sc = cost(tt) + PEN * over(tt);
-        if (!best || sc < best.sc - 1e-9) best = { sc, tt };
-      }
-      if (best) { t.v = best.tt.v; t.r = best.tt.r; }
-    }
-    function insertAt(t, x) {
-      const { v, r } = t, d0 = dur(t), o0 = Math.max(0, d0 - v.cap); let best = { d: Infinity, k: 0 };
-      for (let k = 0; k <= r.length; k++) {
-        const a = k ? v.M[r[k - 1]][x] : v.F[x], c = k < r.length ? v.M[x][r[k]] : v.L[x];
-        const o = k ? (k < r.length ? v.M[r[k - 1]][r[k]] : v.L[r[k - 1]]) : (r.length ? v.F[r[0]] : 0);
-        const dd = a + c - o + dwell, d = dd + PEN * (Math.max(0, d0 + dd - v.cap) - o0);
-        if (d < best.d) best = { d, k };
-      }
-      return best;
-    }
-    const near = (a, b) => MM.drive[a][b] + MM.drive[b][a];
-    function solveK(K, iters, init, report) {
-      let start = null, startSc = Infinity;
-      const tries = init ? [init] : [];
-      for (let rs = 0; rs < 8; rs++) {
-        let cents = cand.slice().sort(() => rand() - 0.5).slice(0, K).map((i) => coords[i]), asg = [];
-        for (let it = 0; it < 15; it++) {
-          asg = cand.map((i) => { let b = 0, bd = Infinity; cents.forEach((c, k) => { const d = (coords[i][0] - c[0]) ** 2 + ((coords[i][1] - c[1]) * 0.78) ** 2; if (d < bd) { bd = d; b = k; } }); return b; });
-          cents = cents.map((c, k) => { const mm = cand.filter((_, j) => asg[j] === k); return mm.length ? [mm.reduce((a, i) => a + coords[i][0], 0) / mm.length, mm.reduce((a, i) => a + coords[i][1], 0) / mm.length] : c; });
-        }
-        const S = Array.from({ length: K }, () => ({ v: V[0], r: [] }));
-        cand.forEach((i, j) => S[asg[j]].r.push(i));
-        tries.push(S.filter((t) => t.r.length));
-      }
-      for (const S of tries) { for (const t of S) pickVariant(t, S); const sc = score(S); if (sc < startSc) { startSc = sc; start = S; } }
-      let cur = clone(start), curSc = startSc, best = clone(start), bestSc = startSc;
-      for (let it = 0; it < iters; it++) {
-        if (it % 250 === 0) report(it / iters);
-        const T = 20 * Math.pow(0.002, it / iters), S = clone(cur), all = S.flatMap((t) => t.r);
-        const q = Math.min(all.length, 3 + Math.floor(rand() * 10));
-        let removed;
-        if (rand() < 0.5) { const s0 = all[Math.floor(rand() * all.length)]; removed = all.slice().sort((a, b) => near(s0, a) - near(s0, b)).slice(0, q); }
-        else removed = all.slice().sort(() => rand() - 0.5).slice(0, q);
-        const rs = new Set(removed);
-        for (const t of S) t.r = t.r.filter((x) => !rs.has(x));
-        // put them back, hardest-to-place first (largest gap between best and second-best spot)
-        while (removed.length) {
-          let pi = -1, pt = null, pk = 0, reg = -Infinity;
-          removed.forEach((x, li) => {
-            const c = S.map((t) => ({ t, ...insertAt(t, x) })).sort((a, b) => a.d - b.d);
-            const g = (c[1] ? c[1].d : 1e6) - c[0].d;
-            if (g > reg) { reg = g; pi = li; pt = c[0].t; pk = c[0].k; }
-          });
-          pt.r.splice(pk, 0, removed[pi]); removed.splice(pi, 1);
-        }
-        for (const t of S) improve(t);
-        if (rand() < 0.15) for (const t of S) pickVariant(t, S);
-        const sc = score(S);
-        if (sc < curSc || rand() < Math.exp((curSc - sc) / T)) { cur = S; curSc = sc; }
-        if (sc < bestSc) { best = clone(S); bestSc = sc; }
-      }
-      for (const t of best) pickVariant(t, best);
-      return { S: best.filter((t) => t.r.length), feasible: best.every((t) => over(t) < 1e-6) };
-    }
-    const skipped = cand.filter((x) => !V.some((v) => v.F[x] + dwell + v.L[x] <= v.cap));
-    const keep = new Set(skipped); for (let i = cand.length - 1; i >= 0; i--) if (keep.has(cand[i])) cand.splice(i, 1);
-    const maxCap = Math.max(...V.map((v) => v.cap));
-    const lo = Math.max(1, Math.ceil(cand.length * dwell / maxCap));
-    const init = ev.data.init ? ev.data.init.map((t) => ({ v: V[0], r: t.filter((x) => cand.includes(x)) })).filter((t) => t.r.length) : null;
-    for (let K = lo; K <= cand.length; K++) {
-      const res = solveK(K, cfg.iters, init && init.length === K ? init : null, (f) => self.postMessage({ progress: f, K }));
-      if (res.feasible) {
-        const order = cfg.kinds.map(([k]) => k);
-        res.S.sort((a, b) => order.indexOf(a.v.kind) - order.indexOf(b.v.kind) || dur(b) - dur(a));
-        self.postMessage({ done: true, trips: res.S.map((t) => ({ kind: t.v.kind, mode: t.v.mode, stops: t.r.map((i) => ids[i]) })), skipped: skipped.map((i) => ids[i]) });
-        return;
-      }
-    }
-    self.postMessage({ done: true, trips: [], skipped: skipped.map((i) => ids[i]) });
-  };
-}
-let worker = null;
-function planProject(candIds, initial, onProgress) {
-  worker?.terminate();
-  worker = new Worker(URL.createObjectURL(new Blob([`(${plannerWorker})()`], { type: 'text/javascript' })));
-  const kinds = Object.entries(KINDS).filter(([k]) => settings.kinds[k].on)
-    .map(([k, v]) => [k, { from: v.from, to: v.to, commuteIn: !!v.commuteIn, commuteOut: !!v.commuteOut, hours: settings.kinds[k].hours, max: settings.kinds[k].max || 0 }]);
-  const modes = ['drive', 'bike'].filter((m) => settings.modes[m]);
-  if (!kinds.length || !modes.length) return Promise.reject(new Error('Turn on at least one kind of trip and Drive or Bike.'));
-  return new Promise((resolve) => {
-    worker.onmessage = (e) => { if (e.data.done) { worker.terminate(); worker = null; resolve(e.data); } else onProgress(e.data); };
-    worker.postMessage({ M: routes.min, ids: routes.ids, anchors: routes.anchors, bcd: WITTER,
-      coords: stations.map((s) => [s.lat, s.lng]), cand: candIds.map(ix), init: initial?.map((t) => t.map(ix)),
-      cfg: { kinds, modes, dwell: settings.dwell, iters: 4000 } });
-  });
-}
-
-// Times and end points of a saved trip, worked out from the travel table.
-function expand(t) {
-  if (!KINDS[t.kind]) return null;
-  const v = variant(t.kind, t.mode), r = t.stops.map(ix).filter((i) => i >= 0);
-  if (!r.length) return null;
-  const legs = [v.first(r[0])]; for (let i = 1; i < r.length; i++) legs.push(v.M[r[i - 1]][r[i]]); legs.push(v.last(r[r.length - 1]));
-  const dwell = settingsOf().dwell, travel = legs.reduce((a, b) => a + b, 0), total = travel + r.length * dwell, end = v.end(r);
-  return { ...t, legs, travel, total, base: v.base, start: v.start(r), end, after: end.after || '', dwell };
-}
-const settingsOf = () => project?.settings || settings;
-
-// ---------- Saving the project ----------
-async function saveProject(p) {
-  project = p;
-  store('si-project', p);
-  projectLocal = p;
-  refresh();
-  if (!live) return;
-  try {
-    await setDoc(planDoc, { v: 1, made: serverTimestamp(), settings: p.settings, trips: p.trips, doneAtMake: p.doneAtMake });
-  } catch (err) {
-    say(`The plan is saved on this device only: the Firebase rules don't allow saving plans yet. <small style="color:var(--muted)">(${esc(err.code || err.message)})</small>`);
-  }
-}
-if (live) {
-  onSnapshot(planDoc, (snap) => {
-    const d = snap.data();
-    if (d && d.trips?.length) {
-      projectRemote = true;
-      project = { settings: d.settings, trips: d.trips, doneAtMake: d.doneAtMake || [], made: d.made?.toMillis?.() || Date.now() };
-      store('si-project', project);
-    } else if (snap.exists() && !d?.trips?.length) { projectRemote = true; project = null; store('si-project', null); }
-    else {
-      project = projectLocal;
-      // A plan made before saving to Firebase was possible goes up now.
-      if (projectLocal?.trips?.length) saveProject(projectLocal);
-    }
-    refresh();
-  }, () => { project = projectLocal; refresh(); });
-} else project = projectLocal;
-
-// ---------- The route shown on the map ----------
-// Either the project trip chosen on this device or a quick trip.
-function currentRoute() {
-  if (active && project?.trips?.[active.i] && routes) {
-    const e = expand(project.trips[active.i]);
-    if (e) return { ...e, title: tripName(active.i), fromProject: true };
-  }
-  return quick;
-}
-const tripNumber = (i) => project.trips.slice(0, i + 1).filter((t) => t.kind === project.trips[i].kind).length;
-
-// ---------- Map layers ----------
-// The whole plan shows while its list is open, and whenever no single trip is in use.
-const showingProject = () => !!(project?.trips?.length && routes && (view?.kind === 'project' || !currentRoute()));
+// ---------- Map ----------
 function stationData() {
-  const lbl = {}, col = {}, plan = currentRoute();
-  if (showRoute && showingProject()) project.trips.forEach((t, i) => t.stops.forEach((id) => { lbl[id] = i + 1; col[id] = KINDS[t.kind].color; }));
-  else if (showRoute && plan) plan.stops.forEach((id, i) => { lbl[id] = i + 1; });
-  const focused = showRoute && (showingProject() || plan);
   return { type: 'FeatureCollection', features: stations.map((s) => ({
     type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-    properties: { id: s.id, name: s.name, done: !!done[s.id], lbl: lbl[s.id] || 0, col: col[s.id] || '',
-                  dim: !!focused && !lbl[s.id], sel: view?.kind === 'station' && view.id === s.id } })) };
-}
-
-function routeData() {
-  const line = (r, color) => ({ type: 'Feature', properties: { col: color },
-    geometry: { type: 'LineString', coordinates: [r.start, ...r.stops.map((id) => byId[id]), r.end].filter(Boolean).map((p) => [p.lng, p.lat]) } });
-  if (!showRoute) return { type: 'FeatureCollection', features: [] };
-  if (showingProject()) return { type: 'FeatureCollection', features: project.trips.map((t) => expand(t)).filter(Boolean)
-    .map((e) => line({ ...e, start: e.start.id === 'cp' ? null : e.start }, KINDS[e.kind].color)) };
-  const plan = currentRoute();
-  return { type: 'FeatureCollection', features: plan ? [line({ ...plan, start: plan.start.id === 'cp' ? null : plan.start }, '#2563eb')] : [] };
+    properties: { id: s.id, name: s.name, done: !!done[s.id], sel: openId === s.id } })) };
 }
 
 function addLayers() {
-  map.addSource('route', { type: 'geojson', data: routeData() });
-  map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': ['get', 'col'], 'line-width': 3, 'line-opacity': .7, 'line-dasharray': [2, 1.5] } });
   map.addSource('st', { type: 'geojson', data: stationData() });
   // To do = filled red; done = white ring with a thick green edge, so the two differ by shape as well as colour.
-  // With a route shown, stations off it fade back and its stops grow to carry their number.
-  const r = ['interpolate', ['linear'], ['zoom'], 11, ['case', ['>', ['get', 'lbl'], 0], 9, 5], 16, ['case', ['>', ['get', 'lbl'], 0], 13, 10]];
   map.addLayer({ id: 'st', type: 'circle', source: 'st', paint: {
-    'circle-radius': r,
-    'circle-color': ['case', ['get', 'done'], '#ffffff', ['!=', ['get', 'col'], ''], ['get', 'col'], '#ef4444'],
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 10],
+    'circle-color': ['case', ['get', 'done'], '#ffffff', '#ef4444'],
     'circle-stroke-color': ['case', ['get', 'sel'], '#1f2937', ['get', 'done'], '#16a34a', '#ffffff'],
-    'circle-stroke-width': ['case', ['get', 'sel'], 4, ['get', 'done'], 3.5, 1.5],
-    'circle-opacity': ['case', ['get', 'dim'], .35, 1],
-    'circle-stroke-opacity': ['case', ['get', 'dim'], .35, 1] } });
-  map.addLayer({ id: 'st-n', type: 'symbol', source: 'st', filter: ['>', ['get', 'lbl'], 0], layout: {
-    'text-field': ['to-string', ['get', 'lbl']], 'text-font': ['Noto Sans Bold'], 'text-size': 11, 'text-allow-overlap': true, 'text-ignore-placement': true },
-    paint: { 'text-color': ['case', ['get', 'done'], '#16a34a', '#ffffff'] } });
+    'circle-stroke-width': ['case', ['get', 'sel'], 4, ['get', 'done'], 3.5, 1.5] } });
   // Names appear once zoomed in close enough to read them.
   map.addLayer({ id: 'st-name', type: 'symbol', source: 'st', minzoom: 15, layout: {
     'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-offset': [0, 1.4], 'text-anchor': 'top', 'text-max-width': 9 },
@@ -484,464 +140,69 @@ function addLayers() {
 }
 
 function refresh() {
-  if (map.getSource('st')) {
-    map.getSource('st').setData(stationData());
-    map.getSource('route').setData(routeData());
-  }
-  drawEnds();
-  const has = !!(currentRoute() || project);
-  $('routeBtn').classList.toggle('on', has);
-  $('eyeBtn').hidden = !has;
-  $('eyeBtn').setAttribute('aria-pressed', String(showRoute));
-  $('eyeBtn').querySelector('.slash').style.display = showRoute ? 'none' : '';
+  map.getSource('st')?.setData(stationData());
   if (!stations.length) return;
   const n = stations.filter((s) => done[s.id]).length;
   $('count').innerHTML = `${n} / ${stations.length} done <span class="lg"><span class="dot"></span>to do <span class="dot done"></span>done</span>`
     + (live ? '' : ' <span class="lg">(demo, not saved)</span>');
-  if (view) render();
+  if (openId) render();
 }
 
-$('eyeBtn').onclick = () => { showRoute = !showRoute; store('si-show', showRoute); refresh(); };
-
-// ---------- Panel ----------
-function show(v) { view = v; render(); refresh(); }
-function hideSheet() { view = null; $('sheet').hidden = true; refresh(); }
-// Closing a station's details goes back to the trip or plan it was opened over.
-$('close').onclick = () => (view?.kind === 'station' && view.back ? show(view.back) : hideSheet());
-
+// ---------- Station details (bottom panel) ----------
 function render() {
-  $('sheet').hidden = false;
-  const b = $('body');
-  b.innerHTML = view.kind === 'station' ? stationHTML(view.id) : view.kind === 'project' ? projectHTML()
-    : view.kind === 'setup' ? setupHTML() : view.kind === 'route' ? routeHTML() : quickHTML();
-  wire(b);
-}
-
-const tabs = (on) => `<div class="tabs"><button data-act="project" aria-pressed="${on === 'project'}">Project</button><button data-act="quick" aria-pressed="${on === 'quick'}">Quick trip</button></div>`;
-const tripName = (i) => `${KINDS[project.trips[i].kind].name} ${tripNumber(i)}`;
-
-function nextStop(plan, after) { return plan?.stops.find((id) => id !== after && !done[id]) || null; }
-
-function stationHTML(id) {
-  const s = byId[id], d = done[id], plan = currentRoute(), k = plan ? plan.stops.indexOf(id) : -1;
-  const when = pending.has(id) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
-  return `<h3>${esc(s.name)}</h3>
-    <div class="meta">Station ${esc(s.num)} · ${s.docks} docks${k >= 0 ? ` · stop ${k + 1} of ${plan.stops.length}` : ''}</div>
-    ${away?.id === id ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
-    <button class="big ${d ? 'undo' : ''}" data-act="toggle" data-id="${id}">${d ? 'Undo' : 'Mark as done'}</button>
+  const s = byId[openId], d = done[openId];
+  const when = pending.has(openId) ? 'Saved on this device, syncing…' : d instanceof Date ? `Done ${d.toLocaleString()}` : '';
+  $('body').innerHTML = `<h3>${esc(s.name)}</h3>
+    <div class="meta">Station ${esc(s.num)} · ${s.docks} docks</div>
+    ${away?.id === openId ? `<div class="away">Nearest station to you · ${fmtDist(away.m)}</div>` : ''}
+    <button class="big ${d ? 'undo' : ''}" id="toggle">${d ? 'Undo' : 'Mark as done'}</button>
     ${when ? `<div class="note">${when}</div>` : ''}`;
+  $('toggle').onclick = () => toggle(s);
+  $('sheet').hidden = false;
+}
+function closeStation() { openId = null; $('sheet').hidden = true; refresh(); }
+$('close').onclick = closeStation;
+
+// Keeps a point clear of the top bar and the bottom panel.
+function padding() {
+  const sheet = $('sheet').hidden ? 0 : $('sheet').offsetHeight;
+  const wide = innerWidth >= 640;
+  return { top: 70, bottom: Math.min((wide ? 20 : sheet) + 30, innerHeight * .6), left: (wide && sheet ? 380 : 30), right: 50 };
 }
 
-// Which saved trip suits right now: mornings before 11, afternoon kinds after.
-function suggested() {
-  if (!project?.trips?.length) return -1;
-  const h = new Date().getHours(), want = h < 11 ? ['morning', 'allday', 'extended'] : ['afternoon', 'allday', 'extended'];
-  const open = project.trips.map((t, i) => ({ t, i })).filter(({ t }) => KINDS[t.kind] && t.stops.some((id) => !done[id]));
-  return (open.find(({ t }) => want.includes(t.kind)) || open[0] || { i: -1 }).i;
+// Centres a point in the clear part of the map. An offset, unlike padding, doesn't stay on the map afterwards.
+function focus(s, zoom) {
+  const pad = padding();
+  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2] });
 }
 
-function projectHTML() {
-  if (!project?.trips?.length) return `${tabs('project')}<h3>Project plan</h3><button class="big blue" data-act="setup">Set up the plan</button>`;
-  if (!routes) return `${tabs('project')}<div class="note">Loading…</div>`;
-  const E = project.trips.map(expand);
-  const all = project.trips.flatMap((t) => t.stops), left = all.filter((id) => !done[id]).length;
-  const doneSince = all.filter((id) => done[id] && !project.doneAtMake.includes(id)).length;
-  const sg = suggested();
-  const rows = E.map((e, i) => {
-    if (!e) return '';
-    const n = e.stops.filter((id) => done[id]).length, k = KINDS[e.kind];
-    return `<li data-trip="${i}" class="${n === e.stops.length ? 'done' : ''}"><span class="n" style="background:${k.color}">${i + 1}</span>
-      <span class="nm"><b>${tripName(i)}</b> · ${MODE[e.mode]} · ${e.stops.length} stops · ${fmtMin(e.total)}${n ? ` · ${n} done` : ''}
-      <br><small style="color:var(--muted)">${k.from} → ${esc(byId[e.stops[0]].name)} … ${esc(byId[e.stops[e.stops.length - 1]].name)} → ${k.to}</small></span>
-      <span class="t">${active?.i === i ? 'in use' : ''}</span></li>`;
-  }).join('');
-  const total = E.reduce((t, e) => t + (e ? e.total - e.base : 0), 0);
-  return `${tabs('project')}<h3>${project.trips.length} trips · ${left} stations · ${fmtMin(total)}</h3>
-    ${projectRemote || !live ? '' : '<div class="meta">Saved on this device only</div>'}
-    ${doneSince ? `<button class="big blue" data-act="update">Update plan (${doneSince} done)</button>` : ''}
-    ${sg >= 0 && !doneSince ? `<button class="big blue" data-act="usetrip" data-id="${sg}">Start ${tripName(sg)}</button>` : ''}
-    <ol class="stops">${rows}</ol>
-    <button class="big plain" data-act="setup">Settings</button>`;
+function openStation(id, fly) {
+  openId = id;
+  render();
+  refresh();
+  const s = byId[id];
+  if (fly) return focus(s, Math.max(map.getZoom(), 15.5));
+  const pt = map.project([s.lng, s.lat]), pad = padding();
+  if (pt.y > innerHeight - pad.bottom || pt.y < pad.top || pt.x < pad.left) focus(s);
 }
 
-function setupHTML() {
-  const st = settings;
-  const kindRows = Object.entries(KINDS).map(([k, v]) => `<div class="krow"><label><input type="checkbox" data-kind="${k}" ${st.kinds[k].on ? 'checked' : ''}>
-      <span>${v.name}<small>${v.from} → ${v.to}</small></span></label>
-      <input type="number" data-hours="${k}" min="0.5" max="12" step="0.5" inputmode="decimal" value="${st.kinds[k].hours}" aria-label="${v.name}, longest trip in hours">
-      <input type="number" data-max="${k}" min="0" max="30" inputmode="numeric" value="${st.kinds[k].max ?? ''}" placeholder="any" aria-label="${v.name}, most trips"></div>`).join('');
-  return `${tabs('project')}<h3>Plan settings</h3>
-    <div class="krow head"><span></span><span>Hours</span><span>Max trips</span></div>
-    ${kindRows}
-    <div class="chk"><label><input type="checkbox" data-mode="drive" ${st.modes.drive ? 'checked' : ''}> Drive</label><label><input type="checkbox" data-mode="bike" ${st.modes.bike ? 'checked' : ''}> Bike</label></div>
-    <label class="f" for="sDwell">Minutes at each stop</label><input class="f" id="sDwell" data-set="dwell" type="number" min="0" max="60" inputmode="numeric" value="${st.dwell}">
-    <button class="big blue" data-act="planproject">${project?.trips?.length ? 'Re-plan' : 'Plan'}</button>
-    ${project?.trips?.length ? '<button class="big plain" data-act="project">Back</button>' : ''}`;
-}
-
-function routeHTML() {
-  const plan = currentRoute();
-  if (!plan) return projectHTML();
-  const left = plan.stops.filter((id) => !done[id]).length;
-  let t = 0;
-  const rows = plan.stops.map((id, i) => {
-    t += plan.legs[i] + (i ? plan.dwell : 0);
-    return `<li data-id="${id}" class="${done[id] ? 'done' : ''}"><span class="n">${i + 1}</span><span class="nm">${esc(byId[id].name)}</span><span class="t">${fmtMin(t)}</span></li>`;
-  }).join('');
-  const lastLeg = plan.legs[plan.legs.length - 1];
-  const endRow = lastLeg > 0.05 ? `<li class="done" style="cursor:default"><span class="n" style="background:var(--ink);border:0;color:#fff">→</span><span class="nm" style="text-decoration:none">${esc(plan.end.label)}</span><span class="t">${fmtMin(plan.total)}</span></li>` : '';
-  const nx = nextStop(plan);
-  const head = plan.fromProject ? esc(plan.title) : 'Quick trip';
-  return `${tabs(plan.fromProject ? 'project' : 'quick')}<h3>${head} · ${MODE[plan.mode]} · ${plan.stops.length} stops · ${fmtMin(plan.total)}</h3>
-    <div class="meta">${esc(plan.start.label)} → ${esc(plan.end.label)}${plan.after ? `, ${plan.after}` : ''}${plan.estimated ? ' · estimated times' : ''}</div>
-    ${nx ? `<button class="big blue" data-act="go" data-id="${nx}">${left === plan.stops.length ? 'Start' : 'Next'}: ${esc(byId[nx].name)} →</button>` : ''}
-    <ol class="stops">${rows}${endRow}</ol>
-    <div class="row">${plan.fromProject ? '<button class="big plain" data-act="project">Plan</button><button class="big plain" data-act="stoptrip">Close trip</button>'
-      : '<button class="big plain" data-act="quick">Change</button><button class="big plain" data-act="clear">Clear</button>'}</div>`;
-}
-
-// ---------- Quick trip (one-off route from any start) ----------
-let form = store('si-form') || { start: 'wf', end: 'same', mode: 'drive', limit: 'time', count: 12, hours: 2, dwell: 10 };
-if (!['drive', 'bike'].includes(form.mode)) form.mode = 'drive';
-if (form.limit === 'all') form.limit = 'time';
-let picked = store('si-picked') || { start: null, end: null };   // points chosen on the map: { kind, id?, lat, lng, label }
-
-function placeOptions(which) {
-  const opts = [['wf', 'BCD'], ['cp', 'DC'], ['me', 'My location'], ['pick', 'Choose on map…']];
-  if (which === 'end') opts.unshift(['same', 'Same as start']);
-  const p = picked[which];
-  if (p) opts.splice(opts.length - 1, 0, ['picked', p.label]);
-  return opts.map(([v, t]) => `<option value="${v}"${form[which] === v ? ' selected' : ''}>${esc(t)}</option>`).join('');
-}
-
-function quickHTML() {
-  const seg = (k, opts) => `<div class="seg">${opts.map(([v, t]) => `<button type="button" data-seg="${k}" data-v="${v}" aria-pressed="${form[k] === v}">${t}</button>`).join('')}</div>`;
-  return `${tabs('quick')}<h3>Quick trip</h3>
-    <label class="f" for="fStart">Start</label><select class="f" id="fStart" data-f="start">${placeOptions('start')}</select>
-    <label class="f" for="fEnd">End</label><select class="f" id="fEnd" data-f="end">${placeOptions('end')}</select>
-    <label class="f">Mode</label>${seg('mode', [['drive', 'Drive'], ['bike', 'Bike']])}
-    <label class="f">How much</label>${seg('limit', [['count', 'Stations'], ['time', 'Time']])}
-    <div class="row">
-      ${form.limit === 'count' ? `<div><label class="f" for="fCount">Stations</label><input class="f" id="fCount" data-f="count" type="number" min="1" max="72" inputmode="numeric" value="${form.count}"></div>` : ''}
-      ${form.limit === 'time' ? `<div><label class="f" for="fHours">Hours</label><input class="f" id="fHours" data-f="hours" type="number" min="0.5" max="12" step="0.5" inputmode="decimal" value="${form.hours}"></div>` : ''}
-      <div><label class="f" for="fDwell">Minutes at each stop</label><input class="f" id="fDwell" data-f="dwell" type="number" min="0" max="60" inputmode="numeric" value="${form.dwell}"></div>
-    </div>
-    <button class="big blue" data-act="plan">Plan</button>`;
-}
-
-function wire(b) {
-  b.querySelectorAll('[data-act]').forEach((el) => el.onclick = () => act(el.dataset.act, el.dataset.id));
-  b.querySelectorAll('[data-seg]').forEach((el) => el.onclick = () => { form[el.dataset.seg] = el.dataset.v; store('si-form', form); render(); });
-  b.querySelectorAll('[data-f]').forEach((el) => el.onchange = () => {
-    const k = el.dataset.f;
-    if (el.value === 'pick') return startPicking(k);
-    form[k] = el.tagName === 'INPUT' ? Number(el.value) : el.value;
-    store('si-form', form);
-  });
-  const saveSettings = () => store('si-settings', settings);
-  b.querySelectorAll('[data-kind]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.kind].on = el.checked; saveSettings(); });
-  b.querySelectorAll('[data-hours]').forEach((el) => el.onchange = () => { settings.kinds[el.dataset.hours].hours = Math.max(0.5, Number(el.value) || 1); saveSettings(); });
-  b.querySelectorAll('[data-max]').forEach((el) => el.onchange = () => { const v = parseInt(el.value, 10); settings.kinds[el.dataset.max].max = v > 0 ? v : null; saveSettings(); });
-  b.querySelectorAll('[data-mode]').forEach((el) => el.onchange = () => { settings.modes[el.dataset.mode] = el.checked; saveSettings(); });
-  b.querySelectorAll('[data-set]').forEach((el) => el.onchange = () => { settings[el.dataset.set] = Math.max(0, Number(el.value) || 0); saveSettings(); });
-  b.querySelectorAll('ol.stops li[data-id]').forEach((el) => el.onclick = () => openStation(el.dataset.id, true));
-  b.querySelectorAll('ol.stops li[data-trip]').forEach((el) => el.onclick = () => useTrip(Number(el.dataset.trip)));
-}
-
-function act(a, id) {
-  if (a === 'toggle') toggle(byId[id]);
-  else if (a === 'go') openStation(id, true);
-  else if (a === 'project') { show({ kind: 'project' }); fitProject(); }
-  else if (a === 'setup') { if (project?.settings) settings = structuredClone(project.settings); show({ kind: 'setup' }); }
-  else if (a === 'quick') show({ kind: 'quick' });
-  else if (a === 'clear') { quick = null; store('si-plan', null); show({ kind: 'quick' }); }
-  else if (a === 'plan') makeQuick();
-  else if (a === 'planproject') runProject(false);
-  else if (a === 'update') runProject(true);
-  else if (a === 'usetrip') useTrip(Number(id));
-  else if (a === 'stoptrip') { active = null; store('si-active', null); show({ kind: 'project' }); fitProject(); }
-}
-
-$('routeBtn').onclick = () => show({ kind: currentRoute() ? 'route' : 'project' });
-
-function useTrip(i) {
-  active = { i }; store('si-active', active);
-  quick = null; store('si-plan', null);
-  show({ kind: 'route' });
-  fitPlan();
-}
-
-async function runProject(update) {
-  const btn = $('body').querySelector(`[data-act="${update ? 'update' : 'planproject'}"]`);
-  const label = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Planning…';
-  try {
-    await routesLoaded;
-    if (update) settings = structuredClone(project.settings);
-    const cand = stations.filter((s) => !done[s.id]).map((s) => s.id);
-    if (!cand.length) throw new Error('Every station is already done.');
-    const initial = update ? project.trips.map((t) => t.stops.filter((id) => !done[id])).filter((t) => t.length) : null;
-    const res = await planProject(cand, initial, ({ progress, K }) => { btn.textContent = `Planning… trying ${K} trip${K > 1 ? 's' : ''}, ${Math.round(progress * 100)}%`; });
-    if (!res.trips.length) throw new Error('No plan fits these limits. Allow longer or more trips.');
-    if (res.skipped.length) say(`${res.skipped.length} station${res.skipped.length > 1 ? 's' : ''} can't fit in any allowed trip.`);
-    active = null; store('si-active', null);
-    await saveProject({ settings: structuredClone(settings), trips: res.trips, doneAtMake: stations.filter((s) => done[s.id]).map((s) => s.id), made: Date.now() });
-    show({ kind: 'project' });
-    fitProject();
-  } catch (err) {
-    btn.disabled = false; btn.textContent = label;
-    say(esc(err.message));
+// Taps count when they land near a dot, not only on it; the closest dot wins.
+map.on('click', (e) => {
+  if (!map.getLayer('st')) return;
+  const p = e.point, r = 22;
+  let best = null;
+  for (const f of map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] })) {
+    const q = map.project(f.geometry.coordinates), d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d <= r && (!best || d < best.d)) best = { id: f.properties.id, d };
   }
-}
-
-// Choosing a start or end on the map: tap a station dot or any spot.
-let picking = null;
-function startPicking(which) {
-  picking = which;
-  $('sheet').hidden = true;
-  $('picking').hidden = false;
-  $('picking').querySelector('span').textContent = `Tap a station or any spot for the ${which}.`;
-}
-$('picking').querySelector('button').onclick = () => { picking = null; $('picking').hidden = true; render(); };
-function finishPicking(p) {
-  picked[picking] = p;
-  form[picking] = 'picked';
-  store('si-picked', picked);
-  store('si-form', form);
-  picking = null;
-  $('picking').hidden = true;
-  show({ kind: 'quick' });
-}
-
-// ---------- Travel times ----------
-const routesLoaded = fetch('routes.json').then((r) => r.json()).then((d) => { routes = d; return d; });
-
-function meters(a, b) {
-  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
-  return 2 * 6371000 * Math.asin(Math.sqrt(h));
-}
-const fmtDist = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m away` : `${(m / 1609.34).toFixed(1)} mi away`;
-
-// Minutes per straight-line metre for a mode, from the baked table: the fallback when routing can't answer.
-function pace(mode) {
-  const m = routes.min[mode], ratios = [];
-  for (let i = 0; i < stations.length; i += 3) for (let j = 1; j < stations.length; j += 5) {
-    const d = meters(byId[routes.ids[i]], byId[routes.ids[j]]);
-    if (d > 300) ratios.push(m[i][j] / d);
-  }
-  ratios.sort((a, b) => a - b);
-  return ratios[ratios.length >> 1];
-}
-
-// Resolve a start/end choice to a point, asking for the device location when needed.
-function place(which) {
-  const v = which === 'end' && form.end === 'same' ? form.start : form[which];
-  const src = which === 'end' && form.end === 'same' ? 'start' : which;
-  if (v === 'wf') return Promise.resolve({ kind: 'station', id: WITTER, lat: byId[WITTER].lat, lng: byId[WITTER].lng, label: 'BCD' });
-  if (v === 'cp') { const a = routes.anchors.find((x) => x.id === 'cp'); return Promise.resolve({ kind: 'anchor', id: a.id, lat: a.lat, lng: a.lng, label: 'DC' }); }
-  if (v === 'picked' && picked[src]) return Promise.resolve(picked[src]);
-  return getLocation().then((me) => ({ kind: 'spot', lat: me.lat, lng: me.lng, label: 'Your location' }));
-}
-
-// Travel-time row and column for one point against every stop, in matrix order.
-async function linkPoint(p, mode) {
-  const idx = p.kind === 'station' || p.kind === 'anchor' ? routes.ids.indexOf(p.id) : -1;
-  if (idx >= 0) return { to: routes.min[mode][idx], from: routes.min[mode].map((r) => r[idx]), estimated: false };
-  const pts = [p, ...routes.ids.map((id) => byId[id] || routes.anchors.find((a) => a.id === id))];
-  const coords = pts.map((q) => `${q.lng.toFixed(6)},${q.lat.toFixed(6)}`).join(';');
-  const url = (side) => `${OSRM[mode]}/table/v1/driving/${coords}?${side}=0&annotations=duration`;
-  try {
-    const get = (side) => fetch(url(side), { signal: AbortSignal.timeout(15000) }).then((r) => r.json());
-    const [a, b] = await Promise.all([get('sources'), get('destinations')]);
-    if (a.code !== 'Ok' || b.code !== 'Ok') throw new Error('routing');
-    return { to: a.durations[0].slice(1).map((s) => s / 60), from: b.durations.slice(1).map((r) => r[0] / 60), estimated: false };
-  } catch {
-    const k = pace(mode), est = pts.slice(1).map((q) => meters(p, q) * k);
-    return { to: est, from: est, estimated: true };
-  }
-}
-
-// Picks stations and orders them: cheapest insertion between the fixed start and end, then
-// 2-opt and single-stop moves until nothing shortens the trip. Times may differ by direction.
-function solve(cand, T, s, e, limit, dwell) {
-  const route = [];
-  const cost = (r) => { let c = 0, prev = s; for (const x of r) { c += T(prev, x); prev = x; } return c + T(prev, e); };
-  const left = new Set(cand);
-  while (left.size) {
-    let best = null;
-    for (const c of left) for (let i = 0; i <= route.length; i++) {
-      const a = i ? route[i - 1] : s, b = i < route.length ? route[i] : e;
-      const inc = T(a, c) + T(c, b) - T(a, b);
-      if (!best || inc < best.inc) best = { c, i, inc };
-    }
-    if (limit.count && route.length >= limit.count) break;
-    if (limit.minutes && cost(route) + route.length * dwell + best.inc + dwell > limit.minutes) break;
-    route.splice(best.i, 0, best.c);
-    left.delete(best.c);
-  }
-  let r = route, cur = cost(r), better = true;
-  while (better) {
-    better = false;
-    for (let i = 0; i < r.length - 1; i++) for (let j = i + 1; j < r.length; j++) {
-      const t = [...r.slice(0, i), ...r.slice(i, j + 1).reverse(), ...r.slice(j + 1)];
-      const c = cost(t);
-      if (c < cur - 1e-9) { r = t; cur = c; better = true; }
-    }
-    for (let i = 0; i < r.length; i++) for (let j = 0; j <= r.length - 1; j++) {
-      if (i === j) continue;
-      const t = r.slice(); const [x] = t.splice(i, 1); t.splice(j, 0, x);
-      const c = cost(t);
-      if (c < cur - 1e-9) { r = t; cur = c; better = true; }
-    }
-  }
-  return r;
-}
-
-// Splits stations into day trips that each fit the daily limit, all from the same start to the same end.
-// Clarke–Wright savings builds compact loops; then the smallest days are dissolved into the others where
-// they fit, and single stations move between days whenever that shortens the total. Returns ordered days.
-function planDays(cand, T, s, e, limit, dwell) {
-  const travel = (r) => { let c = 0, prev = s; for (const x of r) { c += T(prev, x); prev = x; } return c + T(prev, e); };
-  const fits = (r) => (!limit.count || r.length <= limit.count) && (!limit.minutes || travel(r) + r.length * dwell <= limit.minutes);
-  const tidy = (r) => solve(r, T, s, e, {}, dwell);
-  if (!limit.count && !limit.minutes) return cand.length ? [tidy(cand)] : [];
-  const reachable = cand.filter((x) => fits([x]));
-  // Savings: joining the day that ends at i to the day that starts at j skips one trip back and out.
-  let days = reachable.map((x) => [x]);
-  const dayOf = new Map(days.map((d) => [d[0], d]));
-  const sav = [];
-  for (const i of reachable) for (const j of reachable) if (i !== j) sav.push([T(i, e) + T(s, j) - T(i, j), i, j]);
-  sav.sort((x, y) => y[0] - x[0]);
-  for (const [, i, j] of sav) {
-    const a = dayOf.get(i), b = dayOf.get(j);
-    if (a === b || a[a.length - 1] !== i || b[0] !== j) continue;
-    const m = [...a, ...b];
-    if (!fits(m)) continue;
-    m.forEach((x) => dayOf.set(x, m));
-    days = days.filter((d) => d !== a && d !== b);
-    days.push(m);
-  }
-  days = days.map(tidy);
-  // Cheapest feasible place for x in day d, or null.
-  const slot = (d, x) => {
-    let best = null;
-    for (let k = 0; k <= d.length; k++) {
-      const t = [...d.slice(0, k), x, ...d.slice(k)];
-      if (!fits(t)) continue;
-      const c = travel(t);
-      if (!best || c < best.c) best = { t, c };
-    }
-    return best;
-  };
-  // Dissolve small days into the others.
-  for (let tries = 0; tries < days.length; tries++) {
-    days.sort((x, y) => x.length - y.length);
-    let merged = false;
-    for (const small of days) {
-      let others = days.filter((d) => d !== small).map((d) => d.slice()), ok = true;
-      for (const x of small) {
-        let best = null, bi = -1;
-        others.forEach((d, i) => { const sl = slot(d, x); if (sl && (!best || sl.c - travel(d) < best.c - travel(others[bi]))) { best = sl; bi = i; } });
-        if (!best) { ok = false; break; }
-        others[bi] = tidy(best.t);
-      }
-      if (ok) { days = others; merged = true; break; }
-    }
-    if (!merged) break;
-  }
-  // Move single stations between days when it shortens the total.
-  for (let pass = 0, moved = true; moved && pass < 6; pass++) {
-    moved = false;
-    for (let ai = 0; ai < days.length; ai++) for (const x of days[ai].slice()) {
-      const A = days[ai], rest = A.filter((y) => y !== x), gainA = travel(A) - travel(rest);
-      for (let bi = 0; bi < days.length; bi++) {
-        if (bi === ai || !rest.length) continue;
-        const sl = slot(days[bi], x);
-        if (sl && sl.c - travel(days[bi]) < gainA - 1e-9) {
-          days[ai] = tidy(rest); days[bi] = tidy(sl.t); moved = true; break;
-        }
-      }
-    }
-  }
-  // Day 1 is the day closest to the start, so "today" works outward from where you are.
-  const near = (d) => d.reduce((t, x) => t + T(s, x), 0) / d.length;
-  return days.filter((d) => d.length).sort((x, y) => near(x) - near(y));
-}
-
-async function makeQuick() {
-  const btn = $('body').querySelector('[data-act="plan"]');
-  const label = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = form.mode !== 'drive' && [form.start, form.end].some((v) => v === 'me' || (v === 'picked' && picked.start?.kind === 'spot') || (v === 'picked' && picked.end?.kind === 'spot'))
-    ? 'Planning… (bike times to a spot take up to 15 s)' : 'Planning…';
-  try {
-    await routesLoaded;
-    const mode = form.mode, dwell = Math.max(0, Number(form.dwell) || 0);
-    const [ps, pe] = await Promise.all([place('start'), place('end')]);
-    const [ls, le] = await Promise.all([linkPoint(ps, mode), linkPoint(pe, mode)]);
-    const M = routes.min[mode], n = routes.ids.length, S = n, E = n + 1;
-    const T = (a, b) => {
-      if (a === b) return 0;
-      if (a === S && b === E) return ls.to[routes.ids.indexOf(pe.id)] ?? meters(ps, pe) * pace(mode);
-      if (a === S) return ls.to[b];
-      if (b === E) return le.from[a];
-      if (a === E || b === S) return 1e6;
-      return M[a][b];
-    };
-    // Heading to DC: driving, the trip ends at the last stop (the drive home isn't counted); biking, it ends with
-    // the ride to whichever Metro station is quickest from the last stop (the train to DC isn't counted).
-    const toDC = pe.id === 'cp';
-    const metros = routes.anchors.filter((a) => a.metro).map((a) => ({ a, i: routes.ids.indexOf(a.id) }));
-    const metroFor = (x) => metros.reduce((b, m) => (M[x][m.i] < M[x][b.i] ? m : b));
-    const Td = !toDC ? T : (a, b) => b !== E ? T(a, b) : a === S || mode === 'drive' ? 0 : M[a][metroFor(a).i];
-    const cand = stations.filter((st) => !done[st.id]).map((st) => routes.ids.indexOf(st.id));
-    const limit = form.limit === 'count' ? { count: Math.max(1, form.count | 0) } : { minutes: form.hours * 60 };
-    if (!cand.length) throw new Error('Every station is already done.');
-    const days = planDays(cand, Td, S, E, limit, dwell);
-    if (!days.length) throw new Error('Not enough time for even one stop. Try more time.');
-    // The fullest group is the one handed over, so the rest stay compact for later.
-    const order = days.reduce((b, d) => (d.length > b.length ? d : b), days[0]);
-    const path = [S, ...order, E], legs = [];
-    for (let i = 1; i < path.length; i++) legs.push(Td(path[i - 1], path[i]));
-    const travel = legs.reduce((a, b) => a + b, 0), last = order[order.length - 1];
-    let end = pe, after = '';
-    if (toDC && mode === 'bike') { const m = metroFor(last).a; end = { kind: 'anchor', id: m.id, lat: m.lat, lng: m.lng, label: m.name }; after = 'then Metro to DC (not counted)'; }
-    if (toDC && mode === 'drive') { const st = byId[routes.ids[last]]; end = { kind: 'station', id: st.id, lat: st.lat, lng: st.lng, label: 'last stop' }; after = 'then drive to DC (not counted)'; }
-    quick = { mode, dwell, start: ps, end, after, stops: order.map((i) => routes.ids[i]), legs, travel, total: travel + order.length * dwell,
-              estimated: ls.estimated || le.estimated, made: Date.now() };
-    store('si-plan', quick);
-    active = null; store('si-active', null);
-    show({ kind: 'route' });
-    fitPlan();
-  } catch (err) {
-    btn.disabled = false; btn.textContent = label;
-    say(esc(err.message === 'location' ? 'Could not get your location for the route. Pick a place on the map instead.' : err.message));
-  }
-}
-
-function fitAll(pts) {
-  const b = new maplibregl.LngLatBounds();
-  pts.filter(Boolean).forEach((p) => b.extend([p.lng, p.lat]));
-  if (!b.isEmpty()) map.fitBounds(b, { padding: padding(), maxZoom: 16 });
-}
-const fitPlan = () => { const p = currentRoute(); if (p) fitAll([p.start.id === 'cp' ? null : p.start, p.end.id === 'cp' ? null : p.end, ...p.stops.map((id) => byId[id])]); };
-const fitProject = () => { if (project?.trips) fitAll(project.trips.flatMap((t) => t.stops).map((id) => byId[id])); };
-
-// Start/end flags for the route in use (DC itself is off the map's area, so it gets no flag).
-const ends = {};
-function drawEnds() {
-  const plan = showRoute && !showingProject() ? currentRoute() : null;
-  for (const k of ['start', 'end']) {
-    const p = plan?.[k];
-    if (!p || p.id === 'cp') { ends[k]?.remove(); continue; }
-    const same = plan.start.lat === plan.end.lat && plan.start.lng === plan.end.lng;
-    if (k === 'end' && same) { ends[k]?.remove(); continue; }
-    ends[k] ??= new maplibregl.Marker({ element: Object.assign(document.createElement('div'), { className: 'end' }), anchor: 'bottom', offset: [0, -12] });
-    ends[k].getElement().textContent = same ? 'Start · End' : k === 'start' ? 'Start' : 'End';
-    ends[k].setLngLat([p.lng, p.lat]).addTo(map);
-  }
-}
+  if (best) openStation(best.id);
+  else if (openId) closeStation();
+});
+map.on('mousemove', (e) => {
+  if (!map.getLayer('st')) return;
+  const p = e.point, r = 12;
+  map.getCanvas().style.cursor = map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] }).length ? 'pointer' : '';
+});
 
 // ---------- Done state ----------
 function toggle(s) {
@@ -968,53 +229,12 @@ if (live) {
   }, () => { $('count').textContent = 'Could not load the done list'; });
 }
 
-// ---------- Opening a station ----------
-// Keeps a point clear of the top bar and the bottom panel.
-function padding() {
-  const sheet = $('sheet').hidden ? 0 : $('sheet').offsetHeight;
-  const wide = innerWidth >= 640;
-  return { top: 70, bottom: Math.min((wide ? 20 : sheet) + 30, innerHeight * .6), left: (wide && sheet ? 380 : 30), right: 50 };
+function meters(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
 }
-
-// Centres a point in the clear part of the map. An offset, unlike padding, doesn't stay on the map afterwards.
-function focus(s, zoom) {
-  const pad = padding();
-  map.flyTo({ center: [s.lng, s.lat], zoom: zoom ?? map.getZoom(), offset: [(pad.left - pad.right) / 2, (pad.top - pad.bottom) / 2] });
-}
-
-function openStation(id, fly) {
-  const back = view?.kind === 'station' ? view.back : view;
-  show({ kind: 'station', id, back });
-  const s = byId[id];
-  if (fly) return focus(s, Math.max(map.getZoom(), 15.5));
-  const pt = map.project([s.lng, s.lat]), pad = padding();
-  if (pt.y > innerHeight - pad.bottom || pt.y < pad.top || pt.x < pad.left) focus(s);
-}
-const closeStation = () => { if (view?.kind === 'station') $('close').onclick(); };
-
-// Taps count when they land near a dot, not only on it; the closest dot wins.
-map.on('click', (e) => {
-  if (!map.getLayer('st')) return;
-  const p = e.point, r = 22;
-  const near = map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] });
-  let best = null;
-  for (const f of near) {
-    const q = map.project(f.geometry.coordinates), d = Math.hypot(q.x - p.x, q.y - p.y);
-    if (d <= r && (!best || d < best.d)) best = { id: f.properties.id, d };
-  }
-  if (picking) {
-    if (best) { const s = byId[best.id]; return finishPicking({ kind: 'station', id: s.id, lat: s.lat, lng: s.lng, label: s.name }); }
-    return finishPicking({ kind: 'spot', lat: e.lngLat.lat, lng: e.lngLat.lng, label: 'Spot on the map' });
-  }
-  if (best) openStation(best.id);
-  else closeStation();
-});
-map.on('mousemove', (e) => {
-  if (!map.getLayer('st')) return;
-  const p = e.point, r = 12;
-  map.getCanvas().style.cursor = picking ? 'crosshair'
-    : map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['st'] }).length ? 'pointer' : '';
-});
+const fmtDist = (m) => m < 1000 ? `${Math.round(m / 10) * 10} m away` : `${(m / 1609.34).toFixed(1)} mi away`;
 
 // ---------- Search by name or number ----------
 const $q = $('q'), $results = $('results'), $msg = $('msg');
@@ -1045,7 +265,6 @@ function pick(id) {
   $q.value = '';
   drawResults(false);
   $q.blur();
-  if (picking) { const s = byId[id]; return finishPicking({ kind: 'station', id: s.id, lat: s.lat, lng: s.lng, label: s.name }); }
   openStation(id, true);
 }
 
@@ -1112,12 +331,10 @@ $('locate').addEventListener('click', async () => {
 const stationsLoaded = fetch('stations.json').then((r) => r.json()).then((list) => {
   stations = list;
   byId = Object.fromEntries(list.map((s) => [s.id, s]));
-  if (quick && !quick.stops.every((id) => byId[id])) { quick = null; store('si-plan', null); }
   refresh();
   if ($q.value) search();
   return list;
 });
-routesLoaded.then(() => refresh());
 map.on('load', async () => {
   await stationsLoaded;
   addLayers();
